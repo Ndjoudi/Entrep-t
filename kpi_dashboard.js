@@ -3,12 +3,51 @@
 
 var KD_OPEN_ZONES = {};
 
+// ── Chargement initial depuis le Dashboard (produits + QI/QD) ─────────────
+async function kdLoadAll() {
+  var st = document.getElementById('kdLoadStatus');
+  function setMsg(msg, color) {
+    if (st) { st.textContent = msg; st.style.color = color || 'var(--accent,#1976d2)'; }
+  }
+
+  // 1. Charger les produits via API Deleev
+  setMsg('⏳ Chargement des produits…');
+  const ids = (typeof getActiveFournIds === 'function') ? getActiveFournIds() : ['191'];
+  if (!ids.length) { setMsg('⚠️ Aucun fournisseur actif — configurez l\'onglet Fournisseurs', 'var(--o,#f57c00)'); return; }
+
+  await uFetchProducts({
+    supplierIds: ids,
+    statusEl:    st,
+    progressEl:  null,
+    fillEl:      null,
+    textEl:      null,
+    btnEl:       null,
+  });
+
+  if (!P || !P.length) { setMsg('❌ Aucun produit chargé', 'var(--r,#d32f2f)'); return; }
+
+  // 2. Charger QI/QD
+  setMsg('⏳ Chargement QI/QD…');
+  await uFetchQIQD({
+    supplierIds: ids,
+    statusEl:    st,
+    btnEl:       null,
+  });
+
+  // 3. Rafraîchir le dashboard
+  rKpiDashboard();
+}
+
 // ── Point d'entrée ───────────────────────────────────────
 function rKpiDashboard() {
   var el = document.getElementById('kpi-dashboard-page');
   if (!el) return;
   if (!P || !P.length) {
-    el.innerHTML = '<div style="padding:40px;color:var(--text3);text-align:center">Importer un CSV produits d\'abord.</div>';
+    el.innerHTML = '<div style="padding:40px;text-align:center">'
+      + '<div style="color:var(--text3);margin-bottom:18px;font-size:14px">Aucun produit chargé.</div>'
+      + '<button onclick="kdLoadAll()" style="background:var(--accent,#1976d2);color:#fff;border:none;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px">📊 Charger produits + QI/QD</button>'
+      + '<div id="kdLoadStatus" style="margin-top:14px;font-size:13px;color:var(--accent)"></div>'
+      + '</div>';
     return;
   }
   el.innerHTML = kdBuildPage();
@@ -223,8 +262,8 @@ function kdBuildPage() {
     h += kdCell(zd.withQI, zd, function(ad) { return ad.withQI; });
     h += kdCell(zd.inStock, zd, function(ad) { return ad.inStock; });
     h += kdPctStockCell(pct, zd);
-    h += kdDvCountCell(zd.qiReel, zd, hasDV);
-    h += kdDvPctCell(pctR, zd, hasDV);
+    h += kdDvCountCell(zd.qiReel, zd, hasQIQD);
+    h += kdDvPctCell(pctR, zd, hasQIQD);
     h += '</tr>';
 
     if (!zOpen) return;
@@ -247,7 +286,7 @@ function kdBuildPage() {
       h += '<td style="padding:5px 14px;text-align:right;font-weight:600;color:var(--text2)">' + ad.withQI + '</td>';
       h += '<td style="padding:5px 14px;text-align:right;font-weight:600;color:var(--text2)">' + ad.inStock + '</td>';
       h += '<td style="padding:5px 14px;text-align:right;font-weight:700;color:' + kdPctColor(aPct) + '">' + aPct.toFixed(1) + '%</td>';
-      if (hasDV) {
+      if (hasQIQD) {
         h += '<td style="padding:5px 14px;text-align:right;color:var(--text2)">' + ad.qiReel + '</td>';
         h += '<td style="padding:5px 14px;text-align:right;font-weight:700;color:' + kdPctColor(200 - aPctR) + '">' + aPctR.toFixed(1) + '%</td>';
       } else {
@@ -266,7 +305,7 @@ function kdBuildPage() {
         h += '<td style="padding:5px 14px;text-align:right;color:var(--text3);font-size:11px">' + fd.withQI + '</td>';
         h += '<td style="padding:5px 14px;text-align:right;color:var(--text3);font-size:11px">' + fd.inStock + '</td>';
         h += '<td style="padding:5px 14px;text-align:right;font-size:11px;color:' + kdPctColor(fPct) + '">' + fPct.toFixed(1) + '%</td>';
-        if (hasDV) {
+        if (hasQIQD) {
           h += '<td style="padding:5px 14px;text-align:right;color:var(--text3);font-size:11px">' + fd.qiReel + '</td>';
           h += '<td style="padding:5px 14px;text-align:right;font-size:11px;color:' + kdPctColor(200 - fPctR) + '">' + fPctR.toFixed(1) + '%</td>';
         } else {
