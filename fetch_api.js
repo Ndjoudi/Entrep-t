@@ -4,7 +4,7 @@
 window.QIQD = {};  // mis à jour par uFetchQIQD()
 
 // ── Fetch QIQD (stock + rupture temps réel) pour les fournisseurs actifs ──────
-async function uFetchQIQD(opts) {
+async function uFetchQIQD(opts) { // retourne une Promise
   opts = opts || {};
   const supplierIds = opts.supplierIds && opts.supplierIds.length
     ? opts.supplierIds

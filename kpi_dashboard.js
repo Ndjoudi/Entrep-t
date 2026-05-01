@@ -35,18 +35,14 @@ function kdBuildDvIdx() {
 
 // ── Calcul données zone / ABC / famille ──────────────────
 function kdComputeData() {
-  var hasDV = typeof DV !== 'undefined' && DV && DV.groups;
-  var dvIdx = kdBuildDvIdx();
+  var hasQIQD = typeof window !== 'undefined' && window.QIQD && Object.keys(window.QIQD).length > 0;
+  // Fallback DV si pas de QIQD
+  var dvIdx = hasQIQD ? {} : kdBuildDvIdx();
 
   var ZONE_ORDER = ['LGV','PF','Rota','Prio','Salée','Sucrée','Liquide','DPH','Frais sec','Autre'];
   var ABC_ORDER  = ['A','B','C','D'];
 
-  // withQI  = nb produits avec QI >= 1 (depuis P)
-  // inStock = nb produits avec stock > 0 (depuis P)
-  // qiReel  = nb produits avec QI >= 1 ET rupture DV < 30j sur les 30 derniers jours
-  function mkNode() {
-    return { withQI: 0, inStock: 0, qiReel: 0, fam: {} };
-  }
+  function mkNode() { return { withQI:0, inStock:0, qiReel:0, fam:{} }; }
 
   var data = {};
   ZONE_ORDER.forEach(function(z) {
@@ -61,20 +57,18 @@ function kdComputeData() {
     var fam = p.f || 'Z';
     if (!data[z]) return;
     if (!data[z].abc[abc]) data[z].abc[abc] = mkNode();
-    if ((p.q || 0) <= 0) return;
 
-    var hasSt = (p.st || 0) > 0;
-    // Priorité : données QIQD API (champ rupt) → sinon DV → sinon inclus par défaut
-    var rupDays;
-    if (typeof window !== 'undefined' && window.QIQD && window.QIQD[p.id] && window.QIQD[p.id].rupt != null) {
-      rupDays = window.QIQD[p.id].rupt;
-    } else if (p.rupt != null) {
-      rupDays = p.rupt;
-    } else {
-      rupDays = dvIdx[String(p.id)]; // undefined si absent des deux sources
-    }
-    // QI réel : rupture < 30j (si aucune source, inclus par défaut)
-    var isQiReel = (rupDays === undefined || rupDays < 30);
+    // ── Source QI/stock : QIQD en priorité, sinon P ──────────────────────────
+    var q = hasQIQD ? window.QIQD[p.id] : null;
+    var qi    = q ? q.qi    : (p.q  || 0);
+    var stock = q ? q.stock : (p.st || 0);
+    var rupDays = q ? q.rupt
+                    : (p.rupt != null ? p.rupt : dvIdx[String(p.id)]);
+
+    if (qi <= 0) return; // pas de QI → ignoré
+
+    var hasSt    = stock > 0;
+    var isQiReel = (rupDays === undefined || rupDays === null || rupDays < 30);
 
     function acc(node) {
       node.withQI++;
@@ -84,12 +78,11 @@ function kdComputeData() {
 
     acc(data[z]);
     acc(data[z].abc[abc]);
-
     if (!data[z].abc[abc].fam[fam]) data[z].abc[abc].fam[fam] = mkNode();
     acc(data[z].abc[abc].fam[fam]);
   });
 
-  return { data: data, hasDV: hasDV, ZONE_ORDER: ZONE_ORDER };
+  return { data:data, hasQIQD:hasQIQD, ZONE_ORDER:ZONE_ORDER };
 }
 
 // ── Couleur % ─────────────────────────────────────────────
@@ -169,19 +162,32 @@ function kdBuildPage() {
   var ZONE_ORDER = comp.ZONE_ORDER;
 
   var h = '';
+  var qiqdCount = typeof window !== 'undefined' && window.QIQD ? Object.keys(window.QIQD).length : 0;
+  var qiqdTs    = typeof S !== 'undefined' ? S.get('qiqd_ts') : null;
+  var syncLabel = qiqdTs ? ('Sync ' + new Date(qiqdTs).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})) : '';
 
   // Header
   h += '<div style="position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border);'
-     + 'padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">';
+     + 'padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap">';
   h += '<span style="font-size:14px;font-weight:700">Dashboard Ruptures</span>';
-  if (!hasDV) {
-    h += '<span style="font-size:11px;background:var(--obg);color:var(--o);border:1px solid var(--obrd);'
-       + 'padding:2px 10px;border-radius:20px">Ventes non chargées — QI réel et % Rupt. réelle indisponibles</span>';
-  } else {
+
+  // Statut QIQD
+  if (qiqdCount > 0) {
     h += '<span style="font-size:11px;background:var(--gbg);color:var(--g);border:1px solid var(--gbrd);'
-       + 'padding:2px 10px;border-radius:20px">✓ Données ventes chargées</span>';
+       + 'padding:2px 10px;border-radius:20px">✓ QI/QD — ' + qiqdCount + ' produits'
+       + (syncLabel ? ' · ' + syncLabel : '') + '</span>';
+  } else {
+    h += '<span style="font-size:11px;background:var(--obg);color:var(--o);border:1px solid var(--obrd);'
+       + 'padding:2px 10px;border-radius:20px">⚠ QI/QD non chargé — ruptures estimées depuis CSV</span>';
   }
-  h += '<button class="btn" style="margin-left:auto;font-size:11px" onclick="KD_OPEN_ZONES={};rKpiDashboard()">↺ Tout replier</button>';
+
+  // Bouton sync QIQD
+  h += '<button id="kdSyncBtn" onclick="kdSyncQIQD()" style="font-size:11px;padding:4px 12px;border:1px solid var(--accent,#1976d2);'
+     + 'border-radius:6px;background:color-mix(in srgb,var(--accent,#1976d2) 10%,transparent);'
+     + 'color:var(--accent,#1976d2);cursor:pointer;white-space:nowrap">📊 Sync QI/QD</button>';
+  h += '<div id="kdSyncStatus" style="font-size:11px;font-family:\'Geist Mono\',monospace;color:var(--text3)"></div>';
+
+  h += '<button class="btn" style="margin-left:auto;font-size:11px" onclick="KD_OPEN_ZONES={};rKpiDashboard()">↺ Replier</button>';
   h += '</div>';
 
   // Tableau
@@ -189,14 +195,14 @@ function kdBuildPage() {
   h += '<table style="border-collapse:collapse;width:100%;font-size:12px;min-width:560px">';
   var th  = 'padding:8px 14px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap';
   var thr = 'padding:8px 14px;text-align:right;border-bottom:1px solid var(--border2);white-space:nowrap';
-  var thd = thr + (hasDV ? '' : ';color:var(--text3)');
+  var thd = thr + (hasQIQD ? '' : ';color:var(--text3)');
   h += '<thead><tr style="background:var(--bg2);position:sticky;top:0;z-index:10">';
   h += '<th style="' + th  + '">Zone / Famille</th>';
   h += '<th style="' + thr + '">Prod avec QI</th>';
   h += '<th style="' + thr + '">En stock</th>';
   h += '<th style="' + thr + '">% Rupture</th>';
-  h += '<th style="' + thd + '" title="Produits actifs dans les ventes (30j)">QI réel</th>';
-  h += '<th style="' + thd + '" title="Taux de rupture moyen sur 30j (données ventes)">% Rupt. réelle</th>';
+  h += '<th style="' + thd + '" title="Produits avec QI ≥ 1 et rupture < 30j (source QI/QD)">QI réel</th>';
+  h += '<th style="' + thd + '" title="Prod avec QI / QI réel × 100">% Rupt. réelle</th>';
   h += '</tr></thead><tbody>';
 
   ZONE_ORDER.forEach(function(zoneName) {
@@ -278,4 +284,31 @@ function kdBuildPage() {
 function kdToggleZone(z) {
   KD_OPEN_ZONES[z] = !KD_OPEN_ZONES[z];
   rKpiDashboard();
+}
+
+// ── Sync QI/QD depuis le bouton Dashboard ─────────────────────────────────────
+function kdSyncQIQD() {
+  var btn = document.getElementById('kdSyncBtn');
+  var st  = document.getElementById('kdSyncStatus');
+  var ids = (typeof getActiveFournIds === 'function') ? getActiveFournIds() : [];
+
+  if (!ids.length) {
+    if (st) { st.textContent = '⚠ Aucun fournisseur actif — configurez dans l\'onglet Fournisseurs'; st.style.color='var(--o)'; }
+    return;
+  }
+  if (btn) btn.disabled = true;
+  if (st)  { st.textContent = 'Chargement…'; st.style.color = 'var(--text3)'; }
+
+  uFetchQIQD({
+    supplierIds: ids,
+    statusEl: st,
+    btnEl: btn,
+  }).then(function() {
+    // Sauvegarde timestamp
+    if (typeof S !== 'undefined') S.set('qiqd_ts', Date.now());
+    if (btn) btn.disabled = false;
+    rKpiDashboard(); // rebuild avec nouvelles données
+  }).catch(function() {
+    if (btn) btn.disabled = false;
+  });
 }
