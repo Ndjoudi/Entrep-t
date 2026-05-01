@@ -11,7 +11,15 @@
 <body>
 <nav id="nav">
   <h1>📦 Reuilly</h1>
-  <button onclick="document.getElementById('dinfo').textContent='Rechargement...';loadFromDrive(false)" style="font-size:11px;border:1px solid var(--border);border-radius:var(--r6);padding:3px 8px;cursor:pointer;background:var(--surface);color:var(--text2)" title="Recharger depuis Google Drive">🔄</button>
+  <div style="position:relative;display:inline-block">
+    <button id="navSrcBtn" onclick="toggleNavSrcPanel()" style="font-size:11px;border:1px solid var(--border);border-radius:var(--r6);padding:3px 8px;cursor:pointer;background:var(--surface);color:var(--text2)" title="Sources de données">🔄</button>
+    <div id="navSrcPanel" style="display:none;position:absolute;top:36px;left:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;min-width:280px;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.15)">
+      <div style="font-size:10px;color:var(--text3);font-family:'Geist Mono',monospace;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Sources de données</div>
+      <div id="navSrcList"></div>
+      <button onclick="navSrcLoad()" style="width:100%;padding:7px;background:var(--accent,#1976d2);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-weight:500;margin-top:10px">📥 Charger la sélection</button>
+      <div id="navSrcStatus" style="display:none;font-size:11px;margin-top:8px;font-family:'Geist Mono',monospace"></div>
+    </div>
+  </div>
   <div style="position:relative;display:inline-block">
     <button id="navApiBtn" onclick="toggleNavApiPanel()" style="font-size:11px;border:1px solid var(--border);border-radius:var(--r6);padding:3px 8px;cursor:pointer;background:var(--surface);color:var(--text2)" title="Synchroniser depuis l'API Deleev">🔌</button>
     <div id="navApiPanel" style="display:none;position:absolute;top:36px;left:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;min-width:260px;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.15)">

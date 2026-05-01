@@ -342,3 +342,170 @@ function uMapProd(ap) {
     groupId: ap.group_id   || null,
   };
 }
+
+// ── Panel Sources 🔄 ──────────────────────────────────────────────────────────
+var NAV_SRC_STATE = {};   // { data: bool, drive: bool, sup_191: bool, … }
+var navSrcPanelInited = false;
+
+function toggleNavSrcPanel() {
+  var panel = document.getElementById('navSrcPanel');
+  if (!panel) return;
+  var open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (!open) {
+    navSrcPanelInited = false;
+    initNavSrcPanel();
+    setTimeout(function() {
+      document.addEventListener('click', function _close(e) {
+        if (!panel.contains(e.target) && e.target.id !== 'navSrcBtn') {
+          panel.style.display = 'none';
+          document.removeEventListener('click', _close);
+        }
+      });
+    }, 10);
+  }
+}
+
+function initNavSrcPanel() {
+  if (navSrcPanelInited) return;
+  navSrcPanelInited = true;
+  var list = document.getElementById('navSrcList');
+  if (!list) return;
+
+  // Valeurs par défaut
+  if (NAV_SRC_STATE.data  === undefined) NAV_SRC_STATE.data  = true;
+  if (NAV_SRC_STATE.drive === undefined) NAV_SRC_STATE.drive = true;
+
+  var html = '';
+
+  // ── Sources fichiers ──────────────────────────────────────
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">';
+  html += '<div><div style="font-size:12px;font-weight:500">📦 Data embarquée</div><div style="font-size:10px;color:var(--text3)">Données intégrées dans data.js</div></div>';
+  html += mkNavTog('data', NAV_SRC_STATE.data);
+  html += '</div>';
+
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">';
+  html += '<div><div style="font-size:12px;font-weight:500">☁️ Google Drive</div><div style="font-size:10px;color:var(--text3)">Fichier CSV sur Drive</div></div>';
+  html += mkNavTog('drive', NAV_SRC_STATE.drive);
+  html += '</div>';
+
+  // ── Fournisseurs API ──────────────────────────────────────
+  var fourn = (typeof getFournisseurs === 'function') ? getFournisseurs() : [];
+  if (fourn.length) {
+    html += '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace;text-transform:uppercase;letter-spacing:.8px;margin:10px 0 6px">Fournisseurs API</div>';
+    fourn.forEach(function(f) {
+      var sid = 'sup_' + f.id;
+      if (NAV_SRC_STATE[sid] === undefined) NAV_SRC_STATE[sid] = !!f.active;
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0">';
+      html += '<div><div style="font-size:12px">' + (f.name || f.id) + '</div>'
+            + '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace">ID ' + f.id + '</div></div>';
+      html += mkNavTog(sid, NAV_SRC_STATE[sid]);
+      html += '</div>';
+    });
+  } else {
+    html += '<div style="font-size:11px;color:var(--text3);margin-top:8px">Aucun fournisseur — configurez l\'onglet <b>Fournisseurs</b></div>';
+  }
+
+  list.innerHTML = html;
+}
+
+// ── Toggle switch HTML ────────────────────────────────────────────────────────
+function mkNavTog(id, on) {
+  var bg = on ? 'var(--accent,#1976d2)' : '#bbb';
+  var tx = on ? '16px' : '2px';
+  return '<span id="ntog_' + id + '" onclick="navToglSrc(\'' + id + '\')" '
+    + 'style="display:inline-flex;width:38px;height:22px;border-radius:11px;background:' + bg + ';'
+    + 'align-items:center;cursor:pointer;transition:background .2s;padding:3px;box-sizing:border-box;flex-shrink:0">'
+    + '<span id="ntog_k_' + id + '" style="width:16px;height:16px;border-radius:50%;background:#fff;'
+    + 'transform:translateX(' + tx + ');transition:transform .2s;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span>'
+    + '</span>';
+}
+
+function navToglSrc(id) {
+  NAV_SRC_STATE[id] = !NAV_SRC_STATE[id];
+  var on = NAV_SRC_STATE[id];
+  var track = document.getElementById('ntog_' + id);
+  var knob  = document.getElementById('ntog_k_' + id);
+  if (track) track.style.background = on ? 'var(--accent,#1976d2)' : '#bbb';
+  if (knob)  knob.style.transform   = on ? 'translateX(16px)' : 'translateX(2px)';
+}
+
+// ── Chargement des sources sélectionnées ─────────────────────────────────────
+async function navSrcLoad() {
+  var st = document.getElementById('navSrcStatus');
+  function setMsg(msg, color) {
+    if (st) { st.style.display = 'block'; st.textContent = msg; st.style.color = color || 'var(--accent,#1976d2)'; }
+  }
+
+  // 1. Data embarquée (B64)
+  if (NAV_SRC_STATE.data) {
+    setMsg('⏳ Data embarquée…');
+    try {
+      var bin = atob(B64);
+      var b = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+      var ds = new DecompressionStream('gzip');
+      var dw = ds.writable.getWriter(); dw.write(b); dw.close();
+      var dr = ds.readable.getReader(); var ch = [];
+      while (true) { var rv = await dr.read(); if (rv.done) break; ch.push(rv.value); }
+      var all = new Uint8Array(ch.reduce(function(a, c) { return a + c.length; }, 0));
+      var off = 0; ch.forEach(function(c) { all.set(c, off); off += c.length; });
+      var parsed = JSON.parse(new TextDecoder().decode(all));
+      P.length = 0;
+      parsed.forEach(function(p) { P.push(p); });
+      if (typeof applyFamOv === 'function') applyFamOv();
+      setMsg('✅ Data : ' + P.length + ' produits', 'var(--g,#388e3c)');
+    } catch (e) {
+      setMsg('❌ Data : ' + e.message, 'var(--r,#d32f2f)');
+    }
+  }
+
+  // 2. Google Drive
+  if (NAV_SRC_STATE.drive) {
+    setMsg('⏳ Google Drive…');
+    var driveOk = false;
+    for (var di = 0; di < DRIVE_PROXIES.length; di++) {
+      try {
+        var resp = await fetch(DRIVE_PROXIES[di], { redirect: 'follow' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var text = await resp.text();
+        if (!text || text.length < 100) throw new Error('Vide');
+        if (typeof parseC === 'function') parseC(text);
+        setMsg('✅ Drive : ' + P.length + ' produits', 'var(--g,#388e3c)');
+        driveOk = true;
+        break;
+      } catch (e) { /* proxy suivant */ }
+    }
+    if (!driveOk) setMsg('⚠️ Drive inaccessible', 'var(--o,#f57c00)');
+  }
+
+  // 3. Fournisseurs API
+  var supIds = Object.keys(NAV_SRC_STATE)
+    .filter(function(k) { return k.indexOf('sup_') === 0 && NAV_SRC_STATE[k]; })
+    .map(function(k) { return k.replace('sup_', ''); });
+
+  if (supIds.length) {
+    setMsg('⏳ Chargement API (' + supIds.length + ' fournisseur(s))…');
+    await uFetchProducts({
+      supplierIds: supIds,
+      statusEl:    st,
+      progressEl:  null,
+      fillEl:      null,
+      textEl:      null,
+      btnEl:       null,
+    });
+  }
+
+  // Finalise
+  if (P && P.length) {
+    if (typeof computeAlerts === 'function') computeAlerts();
+    if (typeof updateBadge  === 'function') updateBadge();
+    if (typeof T === 'function') T('kpi-dashboard');
+    var di2 = document.getElementById('dinfo');
+    if (di2) di2.textContent = P.length + ' produits';
+    setTimeout(function() {
+      var panel = document.getElementById('navSrcPanel');
+      if (panel) panel.style.display = 'none';
+    }, 1500);
+  }
+}
