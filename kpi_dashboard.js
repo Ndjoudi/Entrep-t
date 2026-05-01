@@ -158,7 +158,7 @@ function kdDvPctCell(pct, zd, hasDV, style) {
 function kdBuildPage() {
   var comp      = kdComputeData();
   var data      = comp.data;
-  var hasDV     = comp.hasDV;
+  var hasQIQD   = comp.hasQIQD;
   var ZONE_ORDER = comp.ZONE_ORDER;
 
   var h = '';
