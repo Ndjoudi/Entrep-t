@@ -416,7 +416,7 @@ module.exports = async function handler(req, res) {
         var qUrl = BASE_QIQD + '?center_id=9&offset=' + offset + '&limit=' + limit +
           '&order=product_name&supplier_id=' + supplierId +
           '&not_order=0&not_order_sold=0&disponibility=order';
-        var qR = await fetch(qUrl, { headers: headers, redirect: 'follow' });
+        var qR = await fetch(qUrl, { headers: { 'Authorization': 'Token ' + apiToken, 'User-Agent': 'Mozilla/5.0' }, redirect: 'follow' });
         if (!qR.ok) return res.status(200).json({ error: 'HTTP ' + qR.status });
         var qText = await qR.text();
         if (!qText.trim().startsWith('{') && !qText.trim().startsWith('[')) {
