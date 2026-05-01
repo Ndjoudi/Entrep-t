@@ -344,8 +344,9 @@ function uMapProd(ap) {
 }
 
 // ── Panel Sources 🔄 ──────────────────────────────────────────────────────────
-var NAV_SRC_STATE = {};   // { data: bool, drive: bool, sup_191: bool, … }
-var navSrcPanelInited = false;
+// Structure : Data toggle | CSV lien | par fournisseur : [Prod] [QI/QD] + toggle ON/OFF
+var NAV_SRC_STATE  = {};   // { data: bool, sup_191: bool, … }
+var NAV_LOADED     = { prod: {}, qiqd: {} };  // track ce qui est déjà chargé
 
 function toggleNavSrcPanel() {
   var panel = document.getElementById('navSrcPanel');
@@ -353,7 +354,6 @@ function toggleNavSrcPanel() {
   var open = panel.style.display !== 'none';
   panel.style.display = open ? 'none' : 'block';
   if (!open) {
-    navSrcPanelInited = false;
     initNavSrcPanel();
     setTimeout(function() {
       document.addEventListener('click', function _close(e) {
@@ -367,49 +367,71 @@ function toggleNavSrcPanel() {
 }
 
 function initNavSrcPanel() {
-  if (navSrcPanelInited) return;
-  navSrcPanelInited = true;
   var list = document.getElementById('navSrcList');
   if (!list) return;
 
-  // Valeurs par défaut
-  if (NAV_SRC_STATE.data  === undefined) NAV_SRC_STATE.data  = true;
-  if (NAV_SRC_STATE.drive === undefined) NAV_SRC_STATE.drive = false;
+  if (NAV_SRC_STATE.data === undefined) NAV_SRC_STATE.data = true;
 
   var html = '';
 
-  // ── Sources fichiers ──────────────────────────────────────
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">';
-  html += '<div><div style="font-size:12px;font-weight:500">📦 Data embarquée</div><div style="font-size:10px;color:var(--text3)">Données intégrées dans data.js</div></div>';
+  // ── Data embarquée ────────────────────────────────────────
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);gap:8px">';
+  html += '<div><div style="font-size:12px;font-weight:500">📦 Data embarquée</div>'
+        + '<div style="font-size:10px;color:var(--text3)">Données intégrées dans data.js</div></div>';
   html += mkNavTog('data', NAV_SRC_STATE.data);
   html += '</div>';
 
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">';
-  html += '<div><div style="font-size:12px;font-weight:500">☁️ Google Drive</div><div style="font-size:10px;color:var(--text3)">Fichier CSV sur Drive</div></div>';
-  html += mkNavTog('drive', NAV_SRC_STATE.drive);
+  // ── Import CSV ────────────────────────────────────────────
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);gap:8px">';
+  html += '<div><div style="font-size:12px;font-weight:500">📂 Import CSV</div>'
+        + '<div style="font-size:10px;color:var(--text3)">Importer un fichier manuellement</div></div>';
+  html += '<button onclick="document.getElementById(\'navSrcPanel\').style.display=\'none\';T(\'import\')" '
+        + 'style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);cursor:pointer;color:var(--text);white-space:nowrap">Ouvrir →</button>';
   html += '</div>';
 
   // ── Fournisseurs API ──────────────────────────────────────
   var fourn = (typeof getFournisseurs === 'function') ? getFournisseurs() : [];
   if (fourn.length) {
-    html += '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace;text-transform:uppercase;letter-spacing:.8px;margin:10px 0 6px">Fournisseurs API</div>';
+    html += '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace;'
+          + 'text-transform:uppercase;letter-spacing:.8px;margin:10px 0 4px">Fournisseurs API</div>';
     fourn.forEach(function(f) {
       var sid = 'sup_' + f.id;
       if (NAV_SRC_STATE[sid] === undefined) NAV_SRC_STATE[sid] = false;
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0">';
-      html += '<div><div style="font-size:12px">' + (f.name || f.id) + '</div>'
-            + '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace">ID ' + f.id + '</div></div>';
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">';
+      // Nom + ID
+      html += '<div style="flex:1;min-width:0">'
+            + '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (f.name || f.id) + '</div>'
+            + '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace">ID ' + f.id + '</div>'
+            + '</div>';
+      // Bouton Prod
+      var prodOk = !!NAV_LOADED.prod[f.id];
+      var prodSt = prodOk
+        ? 'border:1px solid var(--g,#388e3c);background:color-mix(in srgb,var(--g,#388e3c) 10%,transparent);color:var(--g,#388e3c)'
+        : 'border:1px solid var(--accent,#1976d2);background:color-mix(in srgb,var(--accent,#1976d2) 10%,transparent);color:var(--accent,#1976d2)';
+      html += '<button onclick="navSrcOneProd(\'' + f.id + '\')" '
+            + 'style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + prodSt + '">'
+            + (prodOk ? '✓ Prod' : 'Prod') + '</button>';
+      // Bouton QI/QD
+      var qiqdOk = !!NAV_LOADED.qiqd[f.id];
+      var qiqdSt = qiqdOk
+        ? 'border:1px solid var(--g,#388e3c);background:color-mix(in srgb,var(--g,#388e3c) 10%,transparent);color:var(--g,#388e3c)'
+        : 'border:1px solid var(--border);background:var(--surface2);color:var(--text2)';
+      html += '<button onclick="navSrcOneQIQD(\'' + f.id + '\')" '
+            + 'style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + qiqdSt + '">'
+            + (qiqdOk ? '✓ QI/QD' : 'QI/QD') + '</button>';
+      // Toggle ON/OFF
       html += mkNavTog(sid, NAV_SRC_STATE[sid]);
       html += '</div>';
     });
   } else {
-    html += '<div style="font-size:11px;color:var(--text3);margin-top:8px">Aucun fournisseur — configurez l\'onglet <b>Fournisseurs</b></div>';
+    html += '<div style="font-size:11px;color:var(--text3);margin-top:8px">'
+          + 'Aucun fournisseur — configurez l\'onglet <b>Fournisseurs</b></div>';
   }
 
   list.innerHTML = html;
 }
 
-// ── Toggle switch HTML ────────────────────────────────────────────────────────
+// ── Toggle switch ─────────────────────────────────────────────────────────────
 function mkNavTog(id, on) {
   var bg = on ? 'var(--accent,#1976d2)' : '#bbb';
   var tx = on ? '16px' : '2px';
@@ -430,14 +452,34 @@ function navToglSrc(id) {
   if (knob)  knob.style.transform   = on ? 'translateX(16px)' : 'translateX(2px)';
 }
 
-// ── Chargement des sources sélectionnées ─────────────────────────────────────
+// ── Chargement individuel : Prod pour un fournisseur ─────────────────────────
+async function navSrcOneProd(supId) {
+  var st = document.getElementById('navSrcStatus');
+  if (st) { st.style.display='block'; st.textContent='⏳ Prod ' + supId + '…'; st.style.color='var(--accent)'; }
+  await uFetchProducts({ supplierIds:[supId], statusEl:st, progressEl:null, fillEl:null, textEl:null, btnEl:null });
+  NAV_LOADED.prod[supId] = true;
+  initNavSrcPanel();   // rafraîchit le panel (bouton → vert)
+  navSrcRefresh();
+}
+
+// ── Chargement individuel : QI/QD pour un fournisseur ────────────────────────
+async function navSrcOneQIQD(supId) {
+  var st = document.getElementById('navSrcStatus');
+  if (st) { st.style.display='block'; st.textContent='⏳ QI/QD ' + supId + '…'; st.style.color='var(--accent)'; }
+  await uFetchQIQD({ supplierIds:[supId], statusEl:st, btnEl:null });
+  NAV_LOADED.qiqd[supId] = true;
+  initNavSrcPanel();   // rafraîchit le panel (bouton → vert)
+  navSrcRefresh();
+}
+
+// ── Chargement groupé : Data + tous les fournisseurs ON ──────────────────────
 async function navSrcLoad() {
   var st = document.getElementById('navSrcStatus');
   function setMsg(msg, color) {
-    if (st) { st.style.display = 'block'; st.textContent = msg; st.style.color = color || 'var(--accent,#1976d2)'; }
+    if (st) { st.style.display='block'; st.textContent=msg; st.style.color=color||'var(--accent,#1976d2)'; }
   }
 
-  // 1. Data embarquée (B64)
+  // 1. Data embarquée
   if (NAV_SRC_STATE.data) {
     setMsg('⏳ Data embarquée…');
     try {
@@ -448,69 +490,48 @@ async function navSrcLoad() {
       var dw = ds.writable.getWriter(); dw.write(b); dw.close();
       var dr = ds.readable.getReader(); var ch = [];
       while (true) { var rv = await dr.read(); if (rv.done) break; ch.push(rv.value); }
-      var all = new Uint8Array(ch.reduce(function(a, c) { return a + c.length; }, 0));
-      var off = 0; ch.forEach(function(c) { all.set(c, off); off += c.length; });
+      var all = new Uint8Array(ch.reduce(function(a,c){return a+c.length;},0));
+      var off = 0; ch.forEach(function(c){all.set(c,off);off+=c.length;});
       var parsed = JSON.parse(new TextDecoder().decode(all));
       P.length = 0;
-      parsed.forEach(function(p) { P.push(p); });
+      parsed.forEach(function(p){P.push(p);});
       if (typeof applyFamOv === 'function') applyFamOv();
       setMsg('✅ Data : ' + P.length + ' produits', 'var(--g,#388e3c)');
-    } catch (e) {
+    } catch(e) {
       setMsg('❌ Data : ' + e.message, 'var(--r,#d32f2f)');
     }
   }
 
-  // 2. Google Drive
-  if (NAV_SRC_STATE.drive) {
-    setMsg('⏳ Google Drive…');
-    var driveOk = false;
-    for (var di = 0; di < DRIVE_PROXIES.length; di++) {
-      try {
-        var resp = await fetch(DRIVE_PROXIES[di], { redirect: 'follow' });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        var text = await resp.text();
-        if (!text || text.length < 100) throw new Error('Vide');
-        if (typeof parseC === 'function') parseC(text);
-        setMsg('✅ Drive : ' + P.length + ' produits', 'var(--g,#388e3c)');
-        driveOk = true;
-        break;
-      } catch (e) { /* proxy suivant */ }
-    }
-    if (!driveOk) setMsg('⚠️ Drive inaccessible', 'var(--o,#f57c00)');
-  }
-
-  // 3. Fournisseurs API
+  // 2. Fournisseurs ON → Prod
   var supIds = Object.keys(NAV_SRC_STATE)
-    .filter(function(k) { return k.indexOf('sup_') === 0 && NAV_SRC_STATE[k]; })
-    .map(function(k) { return k.replace('sup_', ''); });
+    .filter(function(k){ return k.indexOf('sup_')===0 && NAV_SRC_STATE[k]; })
+    .map(function(k){ return k.replace('sup_',''); });
 
   if (supIds.length) {
-    setMsg('⏳ Chargement API (' + supIds.length + ' fournisseur(s))…');
-    await uFetchProducts({
-      supplierIds: supIds,
-      statusEl:    st,
-      progressEl:  null,
-      fillEl:      null,
-      textEl:      null,
-      btnEl:       null,
-    });
+    setMsg('⏳ Prod API (' + supIds.length + ' fournisseur(s))…');
+    await uFetchProducts({ supplierIds:supIds, statusEl:st, progressEl:null, fillEl:null, textEl:null, btnEl:null });
+    supIds.forEach(function(id){ NAV_LOADED.prod[id] = true; });
+    initNavSrcPanel();
   }
 
-  // Finalise — rafraîchit l'onglet actif (quel qu'il soit)
+  navSrcRefresh();
   if (P && P.length) {
-    if (typeof computeAlerts === 'function') computeAlerts();
-    if (typeof updateBadge  === 'function') updateBadge();
-    var di2 = document.getElementById('dinfo');
-    if (di2) di2.textContent = P.length + ' produits';
-    // Trouve l'onglet actuellement visible et le re-rend
-    if (typeof T === 'function') {
-      var activePage = document.querySelector('.page.active');
-      var activeTab  = activePage ? activePage.id.replace('-page', '') : 'kpi-dashboard';
-      T(activeTab);
-    }
-    setTimeout(function() {
+    setTimeout(function(){
       var panel = document.getElementById('navSrcPanel');
       if (panel) panel.style.display = 'none';
     }, 1500);
+  }
+}
+
+// ── Rafraîchit l'onglet actif ─────────────────────────────────────────────────
+function navSrcRefresh() {
+  if (!P || !P.length) return;
+  if (typeof computeAlerts === 'function') computeAlerts();
+  if (typeof updateBadge  === 'function') updateBadge();
+  var di = document.getElementById('dinfo');
+  if (di) di.textContent = P.length + ' produits';
+  if (typeof T === 'function') {
+    var ap = document.querySelector('.page.active');
+    T(ap ? ap.id.replace('-page','') : 'kpi-dashboard');
   }
 }
