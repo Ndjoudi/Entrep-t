@@ -174,7 +174,6 @@ function fDelete(i) {
   if(!confirm('Supprimer "'+fEsc(f.name||f.id)+'" ?')) return;
   list.splice(i,1);
   saveFournisseurs(list);
-  syncNavSuppliers();
   rFournisseurs();
 }
 
@@ -183,8 +182,6 @@ function fToggle(i, active) {
   if(!list[i]) return;
   list[i].active=active;
   saveFournisseurs(list);
-  syncNavSuppliers();
-  // Rerender juste le footer sans rebuilder toute la liste
   rFournisseurs();
 }
 
@@ -223,9 +220,3 @@ function fSyncQIQD() {
   });
 }
 
-// ── Synchronise navSelSuppliers (panel 🔌) avec la liste persistée ─────────
-function syncNavSuppliers() {
-  if(typeof navSelSuppliers === 'undefined') return;
-  navSelSuppliers.clear();
-  getActiveFournIds().forEach(function(id){ navSelSuppliers.add(id); });
-}

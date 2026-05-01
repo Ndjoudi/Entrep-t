@@ -87,112 +87,11 @@ const NAV_SUPPLIERS = {
   '2286': 'Système U Jardin BIO',
 };
 
-// IDs sélectionnés = fournisseurs actifs depuis localStorage (sync avec onglet Fournisseurs)
-let navSelSuppliers = new Set();
-
-// ── Initialise le panel fournisseurs (appelé au 1er clic)
-let navPanelInited = false;
-function initNavApiPanel() {
-  // Toujours reconstruire depuis la liste persistée (peut changer depuis l'onglet Fournisseurs)
-  navPanelInited = false;
-  navSelSuppliers.clear();
-  const saved = (typeof getFournisseurs === 'function') ? getFournisseurs() : [];
-  saved.filter(function(f){ return f.active; }).forEach(function(f){ navSelSuppliers.add(f.id); });
-
-  if (navPanelInited) return;
-  navPanelInited = true;
-  const list = document.getElementById('navSupList');
-  if (!list) return;
-  list.innerHTML = '';
-
-  const fourn = (typeof getFournisseurs === 'function') ? getFournisseurs() : [];
-  if (!fourn.length) {
-    list.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:4px 0">Aucun fournisseur — configurez dans l\'onglet <b>Fournisseurs</b></div>';
-    return;
-  }
-  fourn.forEach(function(f) {
-    const lbl = document.createElement('label');
-    lbl.style.cssText = 'display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:3px 0';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.value = f.id;
-    cb.checked = f.active;
-    if (f.active) navSelSuppliers.add(f.id);
-    cb.onchange = function() {
-      if (cb.checked) navSelSuppliers.add(f.id); else navSelSuppliers.delete(f.id);
-    };
-    lbl.appendChild(cb);
-    lbl.appendChild(document.createTextNode((f.name || f.id) + ' (' + f.id + ')'));
-    list.appendChild(lbl);
-  });
-}
-
-function toggleNavApiPanel() {
-  const panel = document.getElementById('navApiPanel');
-  if (!panel) return;
-  const open = panel.style.display !== 'none';
-  panel.style.display = open ? 'none' : 'block';
-  if (!open) { navPanelInited = false; initNavApiPanel(); }
-  // Ferme au clic extérieur
-  if (!open) {
-    setTimeout(function() {
-      document.addEventListener('click', function _close(e) {
-        if (!panel.contains(e.target) && e.target.id !== 'navApiBtn') {
-          panel.style.display = 'none';
-          document.removeEventListener('click', _close);
-        }
-      });
-    }, 10);
-  }
-}
-
-function navApiAddCustom() {
-  const inp = document.getElementById('navSupCustom');
-  if (!inp) return;
-  const ids = inp.value.split(/[,;\s]+/).map(function(s){ return s.trim(); }).filter(Boolean);
-  const list = document.getElementById('navSupList');
-  ids.forEach(function(id) {
-    if (navSelSuppliers.has(id)) return;
-    navSelSuppliers.add(id);
-    if (!list) return;
-    const lbl = document.createElement('label');
-    lbl.style.cssText = 'display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:3px 0;color:var(--text2)';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.value = id;
-    cb.checked = true;
-    cb.onchange = function() {
-      if (cb.checked) navSelSuppliers.add(id); else navSelSuppliers.delete(id);
-    };
-    lbl.appendChild(cb);
-    lbl.appendChild(document.createTextNode('#' + id));
-    list.appendChild(lbl);
-  });
-  inp.value = '';
-}
-
-// ── Fetch depuis le panel nav ─────────────────────────────────────────────────
-async function uFetchNavProducts() {
-  const ids = Array.from(navSelSuppliers);
-  if (!ids.length) {
-    const st = document.getElementById('navApiStatus');
-    if (st) { st.style.display = 'block'; st.textContent = '⚠️ Aucun fournisseur sélectionné'; st.style.color = 'var(--o,#f57c00)'; }
-    return;
-  }
+// ── Fetch depuis l'onglet Import (bouton API) ─────────────────────────────────
+async function uFetchProductsImport() {
+  var ids = (typeof getActiveFournIds === 'function') ? getActiveFournIds() : ['191'];
   await uFetchProducts({
     supplierIds:  ids,
-    statusEl:     document.getElementById('navApiStatus'),
-    progressEl:   document.getElementById('navApiProgress'),
-    fillEl:       document.getElementById('navApiProgressFill'),
-    textEl:       document.getElementById('navApiProgressText'),
-    btnEl:        null,
-  });
-}
-
-// ── Fetch depuis l'onglet Import (bouton existant) ────────────────────────────
-async function uFetchProductsImport() {
-  await uFetchProducts({
-    supplierIds:  Array.from(navSelSuppliers),   // reprend la même sélection
     statusEl:     document.getElementById('uProdStatus'),
     progressEl:   document.getElementById('uProdProgress'),
     fillEl:       document.getElementById('uProdProgressFill'),
