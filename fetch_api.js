@@ -243,9 +243,7 @@ function uMapProd(ap) {
 }
 
 // ── Panel Sources 🔄 ──────────────────────────────────────────────────────────
-// Structure : Data toggle | CSV lien | par fournisseur : [Prod] [QI/QD] + toggle ON/OFF
-var NAV_SRC_STATE  = {};   // { data: bool, sup_191: bool, … }
-var NAV_LOADED     = { prod: {}, qiqd: {} };  // track ce qui est déjà chargé
+var NAV_LOADED = { data: false, prod: {}, qiqd: {} };
 
 function toggleNavSrcPanel() {
   var panel = document.getElementById('navSrcPanel');
@@ -269,15 +267,19 @@ function initNavSrcPanel() {
   var list = document.getElementById('navSrcList');
   if (!list) return;
 
-  if (NAV_SRC_STATE.data === undefined) NAV_SRC_STATE.data = true;
-
   var html = '';
 
   // ── Data embarquée ────────────────────────────────────────
+  var dataLoaded = typeof P !== 'undefined' && P && P.length > 0;
+  var dataOk = NAV_LOADED.data;
+  var dataSt = dataOk
+    ? 'border:1px solid var(--g,#388e3c);background:color-mix(in srgb,var(--g,#388e3c) 10%,transparent);color:var(--g,#388e3c)'
+    : 'border:1px solid var(--accent,#1976d2);background:color-mix(in srgb,var(--accent,#1976d2) 10%,transparent);color:var(--accent,#1976d2)';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);gap:8px">';
   html += '<div><div style="font-size:12px;font-weight:500">📦 Data embarquée</div>'
-        + '<div style="font-size:10px;color:var(--text3)">Données intégrées dans data.js</div></div>';
-  html += mkNavTog('data', NAV_SRC_STATE.data);
+        + '<div style="font-size:10px;color:var(--text3)">' + (dataLoaded ? P.length + ' produits en mémoire' : 'Données intégrées dans data.js') + '</div></div>';
+  html += '<button onclick="navSrcLoadData()" style="font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;white-space:nowrap;' + dataSt + '">'
+        + (dataOk ? '✓ Chargé' : 'Charger') + '</button>';
   html += '</div>';
 
   // ── Import CSV ────────────────────────────────────────────
@@ -294,61 +296,57 @@ function initNavSrcPanel() {
     html += '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace;'
           + 'text-transform:uppercase;letter-spacing:.8px;margin:10px 0 4px">Fournisseurs API</div>';
     fourn.forEach(function(f) {
-      var sid = 'sup_' + f.id;
-      if (NAV_SRC_STATE[sid] === undefined) NAV_SRC_STATE[sid] = false;
-      html += '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">';
-      // Nom + ID
-      html += '<div style="flex:1;min-width:0">'
-            + '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (f.name || f.id) + '</div>'
-            + '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace">ID ' + f.id + '</div>'
-            + '</div>';
-      // Bouton Prod
       var prodOk = !!NAV_LOADED.prod[f.id];
+      var qiqdOk = !!NAV_LOADED.qiqd[f.id];
       var prodSt = prodOk
         ? 'border:1px solid var(--g,#388e3c);background:color-mix(in srgb,var(--g,#388e3c) 10%,transparent);color:var(--g,#388e3c)'
         : 'border:1px solid var(--accent,#1976d2);background:color-mix(in srgb,var(--accent,#1976d2) 10%,transparent);color:var(--accent,#1976d2)';
-      html += '<button onclick="navSrcOneProd(\'' + f.id + '\')" '
-            + 'style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + prodSt + '">'
-            + (prodOk ? '✓ Prod' : 'Prod') + '</button>';
-      // Bouton QI/QD
-      var qiqdOk = !!NAV_LOADED.qiqd[f.id];
       var qiqdSt = qiqdOk
         ? 'border:1px solid var(--g,#388e3c);background:color-mix(in srgb,var(--g,#388e3c) 10%,transparent);color:var(--g,#388e3c)'
         : 'border:1px solid var(--border);background:var(--surface2);color:var(--text2)';
-      html += '<button onclick="navSrcOneQIQD(\'' + f.id + '\')" '
-            + 'style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + qiqdSt + '">'
-            + (qiqdOk ? '✓ QI/QD' : 'QI/QD') + '</button>';
-      // Toggle ON/OFF
-      html += mkNavTog(sid, NAV_SRC_STATE[sid]);
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">';
+      html += '<div style="flex:1;min-width:0">'
+            + '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (f.name || f.id) + '</div>'
+            + '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace">ID ' + f.id + '</div></div>';
+      html += '<button onclick="navSrcOneProd(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + prodSt + '">' + (prodOk ? '✓ Prod' : 'Prod') + '</button>';
+      html += '<button onclick="navSrcOneQIQD(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + qiqdSt + '">' + (qiqdOk ? '✓ QI/QD' : 'QI/QD') + '</button>';
       html += '</div>';
     });
   } else {
-    html += '<div style="font-size:11px;color:var(--text3);margin-top:8px">'
-          + 'Aucun fournisseur — configurez l\'onglet <b>Fournisseurs</b></div>';
+    html += '<div style="font-size:11px;color:var(--text3);margin-top:8px">Aucun fournisseur — configurez l\'onglet <b>Fournisseurs</b></div>';
   }
 
   list.innerHTML = html;
 }
 
-// ── Toggle switch ─────────────────────────────────────────────────────────────
-function mkNavTog(id, on) {
-  var bg = on ? 'var(--accent,#1976d2)' : '#bbb';
-  var tx = on ? '16px' : '2px';
-  return '<span id="ntog_' + id + '" onclick="navToglSrc(\'' + id + '\')" '
-    + 'style="display:inline-flex;width:38px;height:22px;border-radius:11px;background:' + bg + ';'
-    + 'align-items:center;cursor:pointer;transition:background .2s;padding:3px;box-sizing:border-box;flex-shrink:0">'
-    + '<span id="ntog_k_' + id + '" style="width:16px;height:16px;border-radius:50%;background:#fff;'
-    + 'transform:translateX(' + tx + ');transition:transform .2s;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span>'
-    + '</span>';
-}
-
-function navToglSrc(id) {
-  NAV_SRC_STATE[id] = !NAV_SRC_STATE[id];
-  var on = NAV_SRC_STATE[id];
-  var track = document.getElementById('ntog_' + id);
-  var knob  = document.getElementById('ntog_k_' + id);
-  if (track) track.style.background = on ? 'var(--accent,#1976d2)' : '#bbb';
-  if (knob)  knob.style.transform   = on ? 'translateX(16px)' : 'translateX(2px)';
+// ── Chargement Data embarquée (B64) ──────────────────────────────────────────
+async function navSrcLoadData() {
+  var st = document.getElementById('navSrcStatus');
+  function setMsg(msg, color) {
+    if (st) { st.style.display='block'; st.textContent=msg; st.style.color=color||'var(--accent,#1976d2)'; }
+  }
+  setMsg('⏳ Data embarquée…');
+  try {
+    var bin = atob(B64);
+    var b = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+    var ds = new DecompressionStream('gzip');
+    var dw = ds.writable.getWriter(); dw.write(b); dw.close();
+    var dr = ds.readable.getReader(); var ch = [];
+    while (true) { var rv = await dr.read(); if (rv.done) break; ch.push(rv.value); }
+    var all = new Uint8Array(ch.reduce(function(a,c){return a+c.length;},0));
+    var off = 0; ch.forEach(function(c){all.set(c,off);off+=c.length;});
+    var parsed = JSON.parse(new TextDecoder().decode(all));
+    P.length = 0;
+    parsed.forEach(function(p){P.push(p);});
+    if (typeof applyFamOv === 'function') applyFamOv();
+    NAV_LOADED.data = true;
+    setMsg('✅ Data : ' + P.length + ' produits', 'var(--g,#388e3c)');
+    initNavSrcPanel();
+    navSrcRefresh();
+  } catch(e) {
+    setMsg('❌ Data : ' + e.message, 'var(--r,#d32f2f)');
+  }
 }
 
 // ── Chargement individuel : Prod pour un fournisseur ─────────────────────────
@@ -371,56 +369,6 @@ async function navSrcOneQIQD(supId) {
   navSrcRefresh();
 }
 
-// ── Chargement groupé : Data + tous les fournisseurs ON ──────────────────────
-async function navSrcLoad() {
-  var st = document.getElementById('navSrcStatus');
-  function setMsg(msg, color) {
-    if (st) { st.style.display='block'; st.textContent=msg; st.style.color=color||'var(--accent,#1976d2)'; }
-  }
-
-  // 1. Data embarquée
-  if (NAV_SRC_STATE.data) {
-    setMsg('⏳ Data embarquée…');
-    try {
-      var bin = atob(B64);
-      var b = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
-      var ds = new DecompressionStream('gzip');
-      var dw = ds.writable.getWriter(); dw.write(b); dw.close();
-      var dr = ds.readable.getReader(); var ch = [];
-      while (true) { var rv = await dr.read(); if (rv.done) break; ch.push(rv.value); }
-      var all = new Uint8Array(ch.reduce(function(a,c){return a+c.length;},0));
-      var off = 0; ch.forEach(function(c){all.set(c,off);off+=c.length;});
-      var parsed = JSON.parse(new TextDecoder().decode(all));
-      P.length = 0;
-      parsed.forEach(function(p){P.push(p);});
-      if (typeof applyFamOv === 'function') applyFamOv();
-      setMsg('✅ Data : ' + P.length + ' produits', 'var(--g,#388e3c)');
-    } catch(e) {
-      setMsg('❌ Data : ' + e.message, 'var(--r,#d32f2f)');
-    }
-  }
-
-  // 2. Fournisseurs ON → Prod
-  var supIds = Object.keys(NAV_SRC_STATE)
-    .filter(function(k){ return k.indexOf('sup_')===0 && NAV_SRC_STATE[k]; })
-    .map(function(k){ return k.replace('sup_',''); });
-
-  if (supIds.length) {
-    setMsg('⏳ Prod API (' + supIds.length + ' fournisseur(s))…');
-    await uFetchProducts({ supplierIds:supIds, statusEl:st, progressEl:null, fillEl:null, textEl:null, btnEl:null });
-    supIds.forEach(function(id){ NAV_LOADED.prod[id] = true; });
-    initNavSrcPanel();
-  }
-
-  navSrcRefresh();
-  if (P && P.length) {
-    setTimeout(function(){
-      var panel = document.getElementById('navSrcPanel');
-      if (panel) panel.style.display = 'none';
-    }, 1500);
-  }
-}
 
 // ── Rafraîchit l'onglet actif ─────────────────────────────────────────────────
 function navSrcRefresh() {
