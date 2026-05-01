@@ -374,7 +374,7 @@ function initNavSrcPanel() {
 
   // Valeurs par défaut
   if (NAV_SRC_STATE.data  === undefined) NAV_SRC_STATE.data  = true;
-  if (NAV_SRC_STATE.drive === undefined) NAV_SRC_STATE.drive = true;
+  if (NAV_SRC_STATE.drive === undefined) NAV_SRC_STATE.drive = false;
 
   var html = '';
 
@@ -395,7 +395,7 @@ function initNavSrcPanel() {
     html += '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace;text-transform:uppercase;letter-spacing:.8px;margin:10px 0 6px">Fournisseurs API</div>';
     fourn.forEach(function(f) {
       var sid = 'sup_' + f.id;
-      if (NAV_SRC_STATE[sid] === undefined) NAV_SRC_STATE[sid] = !!f.active;
+      if (NAV_SRC_STATE[sid] === undefined) NAV_SRC_STATE[sid] = false;
       html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0">';
       html += '<div><div style="font-size:12px">' + (f.name || f.id) + '</div>'
             + '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace">ID ' + f.id + '</div></div>';
@@ -496,13 +496,18 @@ async function navSrcLoad() {
     });
   }
 
-  // Finalise
+  // Finalise — rafraîchit l'onglet actif (quel qu'il soit)
   if (P && P.length) {
     if (typeof computeAlerts === 'function') computeAlerts();
     if (typeof updateBadge  === 'function') updateBadge();
-    if (typeof T === 'function') T('kpi-dashboard');
     var di2 = document.getElementById('dinfo');
     if (di2) di2.textContent = P.length + ' produits';
+    // Trouve l'onglet actuellement visible et le re-rend
+    if (typeof T === 'function') {
+      var activePage = document.querySelector('.page.active');
+      var activeTab  = activePage ? activePage.id.replace('-page', '') : 'kpi-dashboard';
+      T(activeTab);
+    }
     setTimeout(function() {
       var panel = document.getElementById('navSrcPanel');
       if (panel) panel.style.display = 'none';
