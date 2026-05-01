@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "api/su.js": {
-      "runtime": "nodejs20.x"
-    }
-  }
-}
