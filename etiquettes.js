@@ -1,0 +1,203 @@
+// ── Étiquettes module ─────────────────────────────────────
+// Dépendances : S (localStorage helper), P (produits), showToast
+
+var ETQ={allee:158,etag:1,niveaux:{}};
+var ETQ_PREFS=S.get('etq_prefs')||{ts:32,bc:33};
+// Initialise les positions par défaut (3 par niveau, 9 niveaux)
+function etqInit(){
+  if(!Object.keys(ETQ.niveaux).length){
+    for(var nv=1;nv<=9;nv++)ETQ.niveaux[nv]=3;
+  }
+}
+
+function rEtiquettes(){
+  etqInit();
+  var el=document.getElementById('etiquettes-page');if(!el)return;
+  var a=ETQ.allee,et=ETQ.etag;
+  var h='';
+  // ── Header ─────────────────────────────────────────────────────────
+  h+='<div style="position:sticky;top:-14px;z-index:10;background:#fff;border-bottom:1px solid var(--border);padding:10px 14px;margin:-14px -14px 16px -14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  h+='<span style="font-size:13px;font-weight:700;color:var(--text2)">🏷 Étiquettes</span>';
+  h+='<div style="display:flex;align-items:center;gap:6px">';
+  h+='<label style="font-size:11px;color:var(--text3)">Allée</label>';
+  h+='<input type="number" value="'+a+'" id="etq-allee" style="width:64px;border:1px solid var(--border2);border-radius:var(--r6);padding:4px 7px;font-size:13px;font-weight:700;text-align:center" oninput="ETQ.allee=+this.value;rEtiquettes()">';
+  h+='<label style="font-size:11px;color:var(--text3)">Étagère</label>';
+  h+='<input type="number" value="'+et+'" id="etq-etag" style="width:56px;border:1px solid var(--border2);border-radius:var(--r6);padding:4px 7px;font-size:13px;font-weight:700;text-align:center" oninput="ETQ.etag=+this.value;rEtiquettes()">';
+  h+='</div>';
+  h+='<button class="btn pri" onclick="etqPrint()">🖨 Imprimer tout</button>';
+  h+='<button class="btn" onclick="etqReset()">↺ Reset</button>';
+  h+='</div>';
+
+  // ── Grille des niveaux ─────────────────────────────────────────────
+  var nivList=Object.keys(ETQ.niveaux).map(Number).sort(function(a,b){return a-b;});
+  nivList.forEach(function(nv){
+    var nbPos=ETQ.niveaux[nv]||1;
+    var codes=[];
+    for(var p=1;p<=nbPos;p++)codes.push(a+'.'+et+'.'+(nv*10+p));
+    h+='<div style="background:#fff;border:1px solid var(--border);border-radius:var(--r10);padding:10px 12px;margin-bottom:8px;box-shadow:var(--sh)">';
+    // Row header
+    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+    h+='<span style="font-size:12px;font-weight:700;color:var(--accent);min-width:52px">Étage '+nv+'x</span>';
+    h+='<span style="font-size:10px;color:var(--text3)">'+nbPos+' emplacement'+(nbPos>1?'s':'')+'</span>';
+    h+='<div style="margin-left:auto;display:flex;gap:4px">';
+    // Ajouter position
+    h+='<button class="btn xs" title="Ajouter un emplacement" onclick="etqAddPos('+nv+')">＋</button>';
+    // Supprimer position
+    if(nbPos>1)h+='<button class="btn xs bad" title="Supprimer dernier emplacement" onclick="etqRemPos('+nv+')">－</button>';
+    // Supprimer le niveau entier
+    if(nivList.length>1)h+='<button class="btn xs bad" title="Supprimer ce niveau" onclick="etqDelNiv('+nv+')">✕ niveau</button>';
+    h+='</div></div>';
+    // Codes
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    codes.forEach(function(code){
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap">'+code+'</div>';
+    });
+    h+='</div></div>';
+  });
+
+  // ── Ajouter un niveau ──────────────────────────────────────────────
+  var nextNv=(nivList.length?Math.max.apply(null,nivList)+1:1);
+  h+='<div style="display:flex;gap:8px;align-items:center;padding:10px 0">';
+  h+='<button class="btn" onclick="etqAddNiv()">＋ Ajouter niveau '+nextNv+'x</button>';
+  h+='</div>';
+
+  el.innerHTML=h;
+}
+
+function etqAddPos(nv){ETQ.niveaux[nv]=(ETQ.niveaux[nv]||1)+1;rEtiquettes();}
+function etqRemPos(nv){if(ETQ.niveaux[nv]>1)ETQ.niveaux[nv]--;rEtiquettes();}
+function etqDelNiv(nv){delete ETQ.niveaux[nv];rEtiquettes();}
+function etqAddNiv(){
+  var nivs=Object.keys(ETQ.niveaux).map(Number);
+  var next=nivs.length?Math.max.apply(null,nivs)+1:1;
+  ETQ.niveaux[next]=3;rEtiquettes();
+}
+function etqReset(){ETQ.niveaux={};etqInit();rEtiquettes();}
+
+
+function setEtqPref(key,val){
+  ETQ_PREFS[key]=val;
+  S.set('etq_prefs',ETQ_PREFS);
+  showToast('Défaut sauvegardé');
+}
+
+
+function setEtqPref(key,val){
+  ETQ_PREFS[key]=val;
+  S.set('etq_prefs',ETQ_PREFS);
+  showToast('Défaut sauvegardé');
+}
+
+function etqPrint(){
+  var a=ETQ.allee,et=ETQ.etag;
+  var nivs=Object.keys(ETQ.niveaux).map(Number).sort(function(x,y){return x-y;});
+  var codes=[];
+  nivs.forEach(function(nv){
+    var nb=ETQ.niveaux[nv]||1;
+    for(var p=1;p<=nb;p++)codes.push(a+'.'+et+'.'+(nv*10+p));
+  });
+  if(!codes.length){showToast('Aucun code à imprimer');return;}
+  function pad(n,l){return String(n).padStart(l,'0');}
+
+  // Build label HTML - barcodes generated by JsBarcode after load
+  var TS=ETQ_PREFS.ts||32,BC=ETQ_PREFS.bc||33,COLS=2;
+  function buildLabels(ts,bc,cols){
+    var lblH=bc+ts*0.6+20;
+    var out='';
+    for(var i=0;i<codes.length;i+=cols){
+      out+='<div style="display:flex;gap:6px;margin-bottom:5px;page-break-inside:avoid">';
+      for(var j=i;j<Math.min(i+cols,codes.length);j++){
+        var pts=codes[j].split('.');
+        var bcStr=pad(+pts[0],4)+'-'+pad(+pts[1],4)+'-'+pad(+pts[2],4);
+        out+='<div style="flex:1;border:2px solid #000;border-radius:5px;padding:6px 10px;display:flex;align-items:center;gap:8px;height:'+lblH+'px">';
+        out+='<span style="font-size:'+ts+'px;font-weight:900;color:#cc0000;line-height:1;flex-shrink:0">&#8679;</span>';
+        out+='<span style="font-size:'+ts+'px;font-weight:900;color:#cc0000;letter-spacing:2px;white-space:nowrap;flex-shrink:0">'+codes[j]+'</span>';
+        out+='<div style="flex:1;min-width:0;height:'+bc+'px"><svg class="bc-svg" data-val="'+bcStr+'" style="width:100%;height:100%"></svg></div>';
+        out+='<span style="font-size:'+ts+'px;font-weight:900;color:#cc0000;line-height:1;flex-shrink:0">&#8679;</span>';
+        out+='</div>';
+      }
+      out+='</div>';
+    }
+    return out;
+  }
+
+  function renderBarcodes(doc){
+    doc.querySelectorAll('.bc-svg').forEach(function(svg){
+      var val=svg.getAttribute('data-val');
+      try{
+        doc.defaultView.JsBarcode(svg,val,{
+          format:'CODE128',displayValue:false,margin:0,
+          width:2,height:parseInt(svg.parentNode.style.height)||70
+        });
+        svg.removeAttribute('width');
+        svg.setAttribute('preserveAspectRatio','none');
+        svg.style.width='100%';
+        svg.style.height='100%';
+      }catch(e){console.error('BC err:',e);}
+    });
+  }
+
+  var w=window.open('','_blank','width=1000,height=700');
+  if(!w){showToast('Autoriser les popups');return;}
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiquettes '+a+'.'+et+'</title>'
+    +'<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial;padding:4mm 0}@media print{#ctrl{display:none}body{padding:2mm 0}}</style>'
+    +'</head><body>'
+    +'<div id="ctrl" style="background:#f0f4f8;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;gap:20px;align-items:center;flex-wrap:wrap">'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +'<label style="font-size:13px;display:flex;align-items:center;gap:10px">Taille texte & flèches <input type="range" id="rTs" min="12" max="80" value="32" style="width:250px"> <b id="vTs">32px</b></label>'
+    +'<label style="font-size:13px;display:flex;align-items:center;gap:10px">Hauteur code-barre <input type="range" id="rBc" min="20" max="80" value="'+BC+'" style="width:250px"> <b id="vBc">'+BC+'px</b></label>'
+    +'<label style="font-size:13px;display:flex;align-items:center;gap:10px">Étiquettes par ligne <input type="range" id="rCols" min="1" max="3" step="1" value="2" style="width:250px"> <b id="vCols">2</b></label>'
+    +'</div>'
+    +'<button onclick="window.print()" style="padding:10px 22px;font-size:14px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer">&#128424; Imprimer</button>'
+    +'<span style="font-size:11px;color:#888">'+codes.length+' étiquettes — '+a+'.'+et+'</span>'
+    +'</div>'
+    +'<div id="etiq">'+buildLabels(TS,BC,2)+'</div>'
+    +'</body></html>');
+  w.document.close();
+
+  var CODES=codes;
+  var PAD=pad;
+
+  var timer=setInterval(function(){
+    if(!w||w.closed){clearInterval(timer);return;}
+    try{
+      var wd=w.document;
+      if(!wd.getElementById('etiq')||!wd.defaultView.JsBarcode)return;
+      clearInterval(timer);
+
+      // Initial render
+      renderBarcodes(wd);
+
+      function upd(){
+        var ts=+wd.getElementById('rTs').value;
+        var bc=+wd.getElementById('rBc').value;
+        var cols=+wd.getElementById('rCols').value;
+        wd.getElementById('vTs').textContent=ts+'px';
+        wd.getElementById('vBc').textContent=bc+'px';
+        wd.getElementById('vCols').textContent=cols;
+        var lblH=bc+ts*0.6+20;
+        var out='';
+        for(var i=0;i<CODES.length;i+=cols){
+          out+='<div style="display:flex;gap:6px;margin-bottom:5px;page-break-inside:avoid">';
+          for(var j=i;j<Math.min(i+cols,CODES.length);j++){
+            var pts2=CODES[j].split('.');
+            var bcc=PAD(+pts2[0],4)+'-'+PAD(+pts2[1],4)+'-'+PAD(+pts2[2],4);
+            out+='<div style="flex:1;border:2px solid #000;border-radius:5px;padding:6px 10px;display:flex;align-items:center;gap:8px;height:'+lblH+'px">';
+            out+='<span style="font-size:'+ts+'px;font-weight:900;color:#cc0000;line-height:1;flex-shrink:0">&#8679;</span>';
+            out+='<span style="font-size:'+ts+'px;font-weight:900;color:#cc0000;letter-spacing:2px;white-space:nowrap;flex-shrink:0">'+CODES[j]+'</span>';
+            out+='<div style="flex:1;min-width:0;height:'+bc+'px"><svg class="bc-svg" data-val="'+bcc+'" style="width:100%;height:100%"></svg></div>';
+            out+='<span style="font-size:'+ts+'px;font-weight:900;color:#cc0000;line-height:1;flex-shrink:0">&#8679;</span>';
+            out+='</div>';
+          }
+          out+='</div>';
+        }
+        wd.getElementById('etiq').innerHTML=out;
+        renderBarcodes(wd);
+      }
+      wd.getElementById('rTs').addEventListener('input',upd);
+      wd.getElementById('rBc').addEventListener('input',upd);
+      wd.getElementById('rCols').addEventListener('input',upd);
+    }catch(e){}
+  },100);
+}

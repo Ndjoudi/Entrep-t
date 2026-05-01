@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Entrepôt Reuilly</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav id="nav">
+  <h1>📦 Reuilly</h1>
+  <button onclick="document.getElementById('dinfo').textContent='Rechargement...';loadFromDrive('https://corsproxy.io/?https://drive.google.com/uc?export=download&id=19fxex1glSbhNf-wxzRADYUAkI6FeA6Sk',false)" style="font-size:11px;border:1px solid var(--border);border-radius:var(--r6);padding:3px 8px;cursor:pointer;background:#fff;color:var(--text2)" title="Recharger depuis Google Drive">🔄</button>
+  <button class="nb active" onclick="T('kpi-dashboard')">Dashboard</button>
+  <button class="nb" onclick="T('dash')">TvMv</button>
+  <button class="nb" onclick="T('plan')">Plan</button>
+  <button class="nb" onclick="T('allee')">Allée</button>
+  <button class="nb" onclick="T('import')">Import CSV</button>
+  <button class="nb" onclick="T('etiquettes')">Étiquettes</button>
+  <button class="nb" onclick="T('settings')">Settings allées</button>
+  <button class="nb" onclick="T('analyse')">Analyse <span id="an-badge-nav" class="bdg" style="display:none">!</span></button>
+  <button class="nb" onclick="T('ventes')">Ventes</button>
+  <div id="nav-r">
+    <span id="ab" class="bdg" style="display:none">0</span>
+    <span id="dinfo"></span>
+  </div>
+</nav>
+<div id="content">
+  <div id="plan-page" class="page"></div>
+  <div id="allee-page" class="page"></div>
+  <div id="dash-page" class="page"></div>
+  <div id="params-page" class="page" style="overflow-y:auto;padding:0"></div>
+  <div id="import-page" class="page"></div>
+  <div id="familles-page" class="page" style="overflow:auto;padding:0"></div>
+  <div id="etiquettes-page" class="page" style="overflow-y:auto;padding:14px"></div>
+  <div id="settings-page" class="page"></div>
+  <!-- VENTES PAGE -->
+  <div id="ventes-page" class="page">
+    <!-- Drop zone -->
+    <div id="vV-drop" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:40px">
+      <div style="text-align:center">
+        <div class="drop-title">📈 Export <em>Ventes</em></div>
+        <div class="drop-sub" style="margin-top:6px">Analyse des ventes par groupe et produit</div>
+      </div>
+      <div class="drop-zones" style="justify-content:center">
+        <div class="drop-zone" id="dzV">
+          <div class="dz-label">📊 Export Ventes CSV</div>
+          <div class="drop-icon">↑</div>
+          <div class="drop-text">Glisse l'export <strong>CSV ventes</strong><br>ou clique pour choisir</div>
+          <input type="file" id="fV" accept=".csv">
+          <div class="file-ok" id="vFVname" style="display:none"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center">
+        <button class="v-sync-btn" id="vSyncBtn" onclick="vSyncDrive()">🔄 Sync Drive</button>
+        <span style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--text3)">ou</span>
+        <button class="btn-launch" id="btnL" onclick="launchV()">Analyser CSV →</button>
+      </div>
+      <div class="file-ok" id="vSyncStatus" style="display:none"></div>
+      <div class="err-box" id="vErrBox"></div>
+    </div>
+    <!-- Dashboard -->
+    <div id="vV-dash">
+      <!-- Topbar -->
+      <div class="v-topbar">
+        <div>
+          <div class="v-brand">Ventes <em>Frais</em></div>
+          <div class="v-meta" id="vTopMeta">—</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <button class="v-sync-btn-sm" id="vResyncBtn" onclick="vResync()">🔄 Resync</button>
+          <button class="ebtn" onclick="expV()">⬇ Export XLSX</button>
+          <button class="rbtn" onclick="resetV()">↩ Fichiers</button>
+        </div>
+      </div>
+      <!-- KPIs -->
+      <div style="padding:8px 24px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:1px;flex-shrink:0">
+        <div class="kpi"><div class="kpi-lbl">CA TTC</div><div class="kpi-val kv-ca" id="vKca">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Unités</div><div class="kpi-val kv-u" id="vKu">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">CA Perdu est.</div><div class="kpi-val kv-r" id="vKcp">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Taux Rupture</div><div class="kpi-val kv-r" id="vKr">—</div></div>
+      </div>
+      <!-- Controls -->
+      <div class="controls">
+        <span class="cl">Granularité</span>
+        <div class="vseg">
+          <button class="v-sb" data-g="day">Jour</button>
+          <button class="v-sb active" data-g="week">Semaine</button>
+          <button class="v-sb" data-g="month">Mois</button>
+        </div>
+        <div class="vsep"></div>
+        <span class="cl">Période</span>
+        <select class="v-sel" id="pSel"></select>
+        <div class="vsep"></div>
+        <select class="v-sel" id="sV">
+          <option value="ca_desc">CA ↓</option>
+          <option value="ca_asc">CA ↑</option>
+          <option value="u_desc">Unités ↓</option>
+          <option value="r_desc">Rupture ↓</option>
+          <option value="promo_desc">% Promo ↓</option>
+          <option value="nom">Nom A→Z</option>
+        </select>
+        <button class="fbtn" id="rfBtn" onclick="vToggleRup()">🔴 Avec ruptures</button>
+        <button class="fbtn" id="rfFournBtn" onclick="vToggleRuptFourn()">🟠 Rupt. fournisseur</button>
+        <button class="fbtn" id="promoBtn" onclick="vTogglePromo()">🟣 Avec promos</button>
+        <button class="fbtn" id="groupeBtn" onclick="vToggleGroupe()">📦 Groupes</button>
+        <div class="vsep"></div>
+        <select class="v-sel" id="vZoneSel" onchange="vZoneFilter=this.value||null;vPageV=1;renderV()"></select>
+        <div class="vsep"></div>
+        <span class="cl">QI</span>
+        <div class="vseg">
+          <button class="v-sb vqi-btn" data-qi="0" onclick="vToggleQi('0')">0</button>
+          <button class="v-sb vqi-btn" data-qi="1" onclick="vToggleQi('1')">1</button>
+          <button class="v-sb vqi-btn" data-qi="1+" onclick="vToggleQi('1+')">≥ 1</button>
+          <button class="v-sb vqi-btn" data-qi="2+" onclick="vToggleQi('2+')">≥ 2</button>
+        </div>
+        <div class="vsep"></div>
+        <span class="cl">Stock</span>
+        <div class="vseg">
+          <button class="v-sb vst-btn" data-st="0" onclick="vToggleSt('0')">0</button>
+          <button class="v-sb vst-btn" data-st="1" onclick="vToggleSt('1')">1</button>
+          <button class="v-sb vst-btn" data-st="1+" onclick="vToggleSt('1+')">≥ 1</button>
+          <button class="v-sb vst-btn" data-st="2+" onclick="vToggleSt('2+')">≥ 2</button>
+        </div>
+        <input class="v-si" id="siV" placeholder="Rechercher…">
+        <span class="rc" id="vRcV"></span>
+      </div>
+      <!-- Table -->
+      <div class="v-body">
+        <div class="tw"><table>
+          <thead><tr>
+            <th class="ns" style="min-width:230px">Groupe / Produit</th>
+            <th class="num">CA TTC</th>
+            <th class="ns" style="min-width:70px">Part CA</th>
+            <th class="num">Unités</th>
+            <th class="num">SR est.</th>
+            <th class="ns" style="min-width:60px">Part U</th>
+            <th class="num">CA Promo</th>
+            <th class="num">% Promo</th>
+            <th class="num">Taux Rupt.</th>
+            <th class="num">QI</th>
+            <th class="num">Stock</th>
+            <th class="ns">Calendrier</th>
+          </tr></thead>
+          <tbody id="tbV"></tbody>
+        </table></div>
+        <div id="paginV" style="padding:0 24px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="analyse-page" class="page" style="overflow:hidden">
+    <div id="an-nav">
+      <button class="antab active" onclick="switchAnTab('stock')">Stock <span class="anbadge b" id="an-nb-stock"></span></button>
+      <button class="antab" onclick="switchAnTab('doublons')">Doublons <span class="anbadge o" id="an-nb-doublons"></span></button>
+      <button class="antab" onclick="switchAnTab('surCmd')">Sur-commande <span class="anbadge b" id="an-nb-surCmd"></span></button>
+      <button class="antab" onclick="switchAnTab('groupes')">Groupes <span class="anbadge o" id="an-nb-groupes"></span></button>
+      <button class="antab" onclick="switchAnTab('msg')">Messagerie <span class="anbadge msg" id="an-nb-msg">0</span></button>
+    </div>
+    <div id="an-content">
+      <!-- STOCK -->
+      <div class="an-pane active" id="an-tp-stock">
+        <div class="an-krow" id="an-stock-kpis"></div>
+        <div class="an-frow" id="an-stock-filters">
+          <span class="an-pill on" onclick="anSetStockFilter('all',this)">Tous</span>
+          <span class="an-pill" onclick="anSetStockFilter('surstock',this)">Surstock</span>
+          <span class="an-pill" onclick="anSetStockFilter('mort',this)">Stock mort</span>
+          <span class="an-pill" onclick="anSetStockFilter('rupture',this)">Rupture</span>
+        </div>
+        <div class="an-frow">
+          <select class="an-sinput" id="an-zone-sel" style="width:160px" onchange="anZoneF=this.value;AN_PAGE=1;anRenderStock()"></select>
+          <input class="an-sinput" type="text" id="an-stock-search" placeholder="Rechercher un produit…" style="width:240px" oninput="anRenderStock()">
+        </div>
+        <div class="an-tcard">
+          <div class="an-tbar"><span class="an-tbar-title" id="an-stock-title">Tous les produits</span><span id="an-stock-count" style="font-size:11px;color:var(--text3)"></span></div>
+          <div class="an-twrap"><table class="an-table"><thead><tr id="an-stock-thead"></tr></thead><tbody id="an-stock-body"></tbody></table></div>
+          <div id="an-stock-pagination" style="padding:8px 12px;border-top:1px solid var(--border)"></div>
+        </div>
+      </div>
+      <!-- DOUBLONS -->
+      <div class="an-pane" id="an-tp-doublons">
+        <div class="an-krow">
+          <div class="an-kpi co"><div class="an-klbl">Ref. fournisseur</div><div class="an-kval o" id="an-kd-ref">—</div><div class="an-ksub">groupes doublons</div></div>
+          <div class="an-kpi co"><div class="an-klbl">Code barre</div><div class="an-kval o" id="an-kd-bc">—</div><div class="an-ksub">groupes doublons</div></div>
+          <div class="an-kpi cr"><div class="an-klbl">Noms similaires</div><div class="an-kval r" id="an-kd-sim">—</div><div class="an-ksub">à vérifier</div></div>
+        </div>
+        <div class="an-frow">
+          <span class="an-pill on" onclick="anSetDupeFilter('all',this)">Tous</span>
+          <span class="an-pill" onclick="anSetDupeFilter('bc',this)">Code barre</span>
+          <span class="an-pill" onclick="anSetDupeFilter('sim',this)">Noms similaires</span>
+          <input class="an-sinput" type="text" id="an-dupe-search" placeholder="Rechercher…" style="width:190px" oninput="anRenderDoublons()">
+        </div>
+        <div id="an-doublons-body"></div>
+      </div>
+      <!-- SUR-COMMANDE -->
+      <div class="an-pane" id="an-tp-surCmd">
+        <div class="an-krow">
+          <div class="an-kpi cb"><div class="an-klbl">Sur-commande</div><div class="an-kval b" id="an-ksc-nb">—</div><div class="an-ksub">QI &gt; 2 × Packaging</div></div>
+        </div>
+        <div class="an-info">Produits dont la <strong>QI est très élevée</strong> par rapport au conditionnement (colis). Si QI &gt; 2 × Packaging, la commande est structurellement sur-dimensionnée.</div>
+        <div class="an-frow"><input class="an-sinput" type="text" id="an-sc-search" placeholder="Rechercher…" style="width:220px" oninput="anRenderSurCmd()"></div>
+        <div class="an-tcard">
+          <div class="an-tbar"><span class="an-tbar-title">Sur-commande structurelle</span><span id="an-scc" style="font-size:11px;color:var(--text3)"></span></div>
+          <div class="an-twrap"><table class="an-table"><thead><tr>
+            <th onclick="anSrtSc('n')" id="an-sch-n">Produit <span class="an-si">⇅</span></th>
+            <th onclick="anSrtSc('z')" id="an-sch-z">Zone <span class="an-si">⇅</span></th>
+            <th class="r" onclick="anSrtSc('q')" id="an-sch-q">QI <span class="an-si">⇅</span></th>
+            <th class="r" onclick="anSrtSc('c')" id="an-sch-c">Colis <span class="an-si">⇅</span></th>
+            <th class="r an-sorted" onclick="anSrtSc('ratio')" id="an-sch-ratio">Ratio QI/Colis <span class="an-si" style="opacity:1">↓</span></th>
+            <th class="r" onclick="anSrtSc('st')" id="an-sch-st">Stock <span class="an-si">⇅</span></th>
+            <th style="width:36px"></th>
+          </tr></thead><tbody id="an-sc-body"></tbody></table></div>
+        </div>
+      </div>
+      <!-- GROUPES -->
+      <div class="an-pane" id="an-tp-groupes">
+        <div class="an-krow" id="an-gr-kpis"></div>
+        <div class="an-info">Regroupe la fiche unité avec ses lots (LOT DE 2, LOT DE 3…). Signale quand la fiche unité est en rupture alors que du stock existe sur un lot, ou quand plusieurs fiches ont une QI active. Cliquer sur une ligne pour voir les fiches secondaires.</div>
+        <div class="an-frow">
+          <span class="an-pill on" onclick="anSetGrFilter('all',this)">Tous</span>
+          <span class="an-pill" onclick="anSetGrFilter('rupture',this)">❌ Rupture unité</span>
+          <span class="an-pill" onclick="anSetGrFilter('surplus',this)">📦 Stock dans lot</span>
+          <span class="an-pill" onclick="anSetGrFilter('multiqi',this)">⚠️ Multi-QI</span>
+          <input class="an-sinput" type="text" id="an-gr-search" placeholder="Rechercher…" style="width:200px" oninput="anRenderGroupes()">
+        </div>
+        <div class="an-tcard">
+          <div class="an-tbar"><span class="an-tbar-title" id="an-gr-title">Groupes produits</span><span id="an-gr-count" style="font-size:11px;color:var(--text3)"></span></div>
+          <div class="an-twrap"><table class="an-table"><thead><tr>
+            <th onclick="anSrtGr('nom')" id="an-grh-nom">Produit (fiche unité) <span class="an-si">⇅</span></th>
+            <th onclick="anSrtGr('zone')" id="an-grh-zone">Zone <span class="an-si">⇅</span></th>
+            <th class="r an-sorted" onclick="anSrtGr('qi_main')" id="an-grh-qi">QI <span class="an-si" style="opacity:1">⇅</span></th>
+            <th class="r" onclick="anSrtGr('stk_main')" id="an-grh-stk">Stock <span class="an-si">⇅</span></th>
+            <th class="r" onclick="anSrtGr('ecart')" id="an-grh-ecart">Stock−QI <span class="an-si">⇅</span></th>
+            <th onclick="anSrtGr('n')" id="an-grh-n">Fiches <span class="an-si">⇅</span></th>
+            <th style="width:36px"></th>
+          </tr></thead><tbody id="an-gr-body"></tbody></table></div>
+        </div>
+      </div>
+      <!-- MESSAGERIE -->
+      <div class="an-pane" id="an-tp-msg">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div><div style="font-size:14px;font-weight:700;margin-bottom:2px">Messagerie</div><div style="font-size:11px;color:var(--text3)">Produits sélectionnés — copier pour partager avec votre équipe</div></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn pri" onclick="anCopyMsg()">📋 Copier</button>
+            <button class="btn bad" onclick="anClearMsg()">🗑 Vider</button>
+          </div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r6);padding:12px;font-family:monospace;font-size:11px;white-space:pre-wrap;min-height:80px;color:var(--text2);margin-bottom:14px;line-height:1.7" id="an-msg-preview">Aucun produit sélectionné.</div>
+        <div id="an-msg-list"></div>
+      </div>
+    </div>
+  </div>
+  <div id="kpi-dashboard-page" class="page" style="overflow:hidden;padding:0;flex-direction:column"></div>
+</div>
+  <script src="data.js"></script>
+  <script src="core.js"></script>
+  <script src="etiquettes.js"></script>
+  <script src="analyse.js"></script>
+  <script src="settings.js"></script>
+  <script src="import.js"></script>
+  <script src="fetch_api.js"></script>
+  <script src="plan.js"></script>
+  <script src="abc.js"></script>
+  <script src="fiche.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="ventes.js"></script>
+  <script src="kpi_dashboard.js"></script>
+</body>
+</html>
