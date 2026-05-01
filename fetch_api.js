@@ -12,28 +12,42 @@ const NAV_SUPPLIERS = {
   '2286': 'Système U Jardin BIO',
 };
 
-// IDs sélectionnés par défaut
-let navSelSuppliers = new Set(['191']);
+// IDs sélectionnés = fournisseurs actifs depuis localStorage (sync avec onglet Fournisseurs)
+let navSelSuppliers = new Set();
 
 // ── Initialise le panel fournisseurs (appelé au 1er clic)
 let navPanelInited = false;
 function initNavApiPanel() {
+  // Toujours reconstruire depuis la liste persistée (peut changer depuis l'onglet Fournisseurs)
+  navPanelInited = false;
+  navSelSuppliers.clear();
+  const saved = (typeof getFournisseurs === 'function') ? getFournisseurs() : [];
+  saved.filter(function(f){ return f.active; }).forEach(function(f){ navSelSuppliers.add(f.id); });
+
   if (navPanelInited) return;
   navPanelInited = true;
   const list = document.getElementById('navSupList');
   if (!list) return;
-  Object.entries(NAV_SUPPLIERS).forEach(function([id, name]) {
+  list.innerHTML = '';
+
+  const fourn = (typeof getFournisseurs === 'function') ? getFournisseurs() : [];
+  if (!fourn.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:4px 0">Aucun fournisseur — configurez dans l\'onglet <b>Fournisseurs</b></div>';
+    return;
+  }
+  fourn.forEach(function(f) {
     const lbl = document.createElement('label');
     lbl.style.cssText = 'display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:3px 0';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.value = id;
-    cb.checked = navSelSuppliers.has(id);
+    cb.value = f.id;
+    cb.checked = f.active;
+    if (f.active) navSelSuppliers.add(f.id);
     cb.onchange = function() {
-      if (cb.checked) navSelSuppliers.add(id); else navSelSuppliers.delete(id);
+      if (cb.checked) navSelSuppliers.add(f.id); else navSelSuppliers.delete(f.id);
     };
     lbl.appendChild(cb);
-    lbl.appendChild(document.createTextNode(name + ' (' + id + ')'));
+    lbl.appendChild(document.createTextNode((f.name || f.id) + ' (' + f.id + ')'));
     list.appendChild(lbl);
   });
 }
@@ -43,7 +57,7 @@ function toggleNavApiPanel() {
   if (!panel) return;
   const open = panel.style.display !== 'none';
   panel.style.display = open ? 'none' : 'block';
-  if (!open) initNavApiPanel();
+  if (!open) { navPanelInited = false; initNavApiPanel(); }
   // Ferme au clic extérieur
   if (!open) {
     setTimeout(function() {

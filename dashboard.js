@@ -354,7 +354,7 @@ function T(tab){
     if(p.classList.contains('active'))_scrollPos[p.id]=p.scrollTop;
   });
 
-  const tabs=['kpi-dashboard','dash','plan','allee','import','etiquettes','settings','analyse','ventes'];
+  const tabs=['kpi-dashboard','dash','plan','allee','import','fournisseurs','etiquettes','settings','analyse','ventes'];
   document.querySelectorAll('.nb').forEach((b,i)=>b.classList.toggle('active',tabs[i]===tab));
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(tab+'-page').classList.add('active');
@@ -363,6 +363,7 @@ function T(tab){
   if(tab==='plan')rPlan();else if(tab==='allee')rAllee();
   else if(tab==='dash')rDash();
   else if(tab==='import')rImport();
+  else if(tab==='fournisseurs')rFournisseurs();
   else if(tab==='etiquettes')rEtiquettes();
   else if(tab==='settings')rSettings();
   else if(tab==='analyse')anInit();
