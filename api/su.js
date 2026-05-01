@@ -366,72 +366,87 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(results);
 
     } else if (action === 'probe_qiqd') {
-      // ── Probe : teste ce que renvoie products.app.deleev.com/products-qiqd ──
+      // ── Probe : teste plusieurs patterns d'API pour trouver le bon endpoint ──
       var supplierId = req.query.supplier || '191';
-      var qiqdUrl = 'https://products.app.deleev.com/products-qiqd?center_id=9&offset=0&limit=10&order=product_name&supplier_id=' + supplierId + '&not_order=0&not_order_sold=0&disponibility=order';
-      try {
-        var qResp = await fetch(qiqdUrl, { headers: headers, redirect: 'follow' });
-        var qText = await qResp.text();
-        var isJson = qText.trim().startsWith('{') || qText.trim().startsWith('[');
-        var parsed = null;
-        if (isJson) { try { parsed = JSON.parse(qText); } catch(e) {} }
-        return res.status(200).json({
-          status: qResp.status,
-          contentType: qResp.headers.get('content-type'),
-          isJson: isJson,
-          length: qText.length,
-          snippet: qText.substring(0, 800),
-          parsed: parsed ? (Array.isArray(parsed) ? parsed.slice(0,2) : parsed) : null,
-        });
-      } catch (err) {
-        return res.status(200).json({ error: err.message });
+      var qs = '?center_id=9&offset=0&limit=5&order=product_name&supplier_id=' + supplierId + '&not_order=0&not_order_sold=0&disponibility=order';
+      var candidates = [
+        'https://products.app.deleev.com/api/products-qiqd/' + qs,
+        'https://products.app.deleev.com/api/products/' + qs,
+        'https://products.app.deleev.com/api/qiqd/' + qs,
+        'https://admin.deleev.com/api/products-qiqd/' + qs,
+        'https://admin.deleev.com/api/v1/products-qiqd/' + qs,
+        'https://admin.deleev.com/products/qiqd/api/' + qs,
+        'https://products.app.deleev.com/products-qiqd' + qs,  // original (déjà testé)
+      ];
+      var results = [];
+      for (var ci = 0; ci < candidates.length; ci++) {
+        var cUrl = candidates[ci];
+        try {
+          var cResp = await fetch(cUrl, { headers: headers, redirect: 'follow' });
+          var cText = await cResp.text();
+          var cIsJson = cText.trim().startsWith('{') || cText.trim().startsWith('[');
+          var cParsed = null;
+          if (cIsJson) { try { cParsed = JSON.parse(cText); } catch(e) {} }
+          results.push({
+            url: cUrl,
+            status: cResp.status,
+            isJson: cIsJson,
+            length: cText.length,
+            snippet: cText.substring(0, 200),
+            keys: cParsed ? (Array.isArray(cParsed) ? ('array['+cParsed.length+']') : Object.keys(cParsed).join(',')) : null,
+          });
+        } catch (err) {
+          results.push({ url: cUrl, error: err.message });
+        }
       }
+      return res.status(200).json({ results: results });
 
     } else if (action === 'qiqd') {
-      // ── Fetch complet QI/QD + ruptures depuis products.app.deleev.com ───────
+      // ── Fetch complet QI/QD + ruptures depuis api.labellevie.com ─────────────
       var supplierId = req.query.supplier || '191';
       var limit = parseInt(req.query.limit) || 500;
+      var sampleOnly = req.query.sample === '1';
       var allProds = [];
       var offset = 0;
-      var maxIter = 100;
+      var total = 0;
+      var maxIter = 50;
+      var BASE_QIQD = 'https://api.labellevie.com/1.0/api/labellevie/products-qiqd';
 
       while (maxIter-- > 0) {
-        var qUrl = 'https://products.app.deleev.com/products-qiqd?center_id=9&offset=' + offset + '&limit=' + limit + '&order=product_name&supplier_id=' + supplierId + '&not_order=0&not_order_sold=0&disponibility=order';
+        var qUrl = BASE_QIQD + '?center_id=9&offset=' + offset + '&limit=' + limit +
+          '&order=product_name&supplier_id=' + supplierId +
+          '&not_order=0&not_order_sold=0&disponibility=order';
         var qR = await fetch(qUrl, { headers: headers, redirect: 'follow' });
         if (!qR.ok) return res.status(200).json({ error: 'HTTP ' + qR.status });
         var qText = await qR.text();
         if (!qText.trim().startsWith('{') && !qText.trim().startsWith('[')) {
-          return res.status(200).json({ error: 'Réponse non-JSON — authentification requise ou endpoint HTML', snippet: qText.substring(0, 300) });
+          return res.status(200).json({ error: 'Non-JSON — cookie invalide pour api.labellevie.com', snippet: qText.substring(0, 200) });
         }
         var qData = JSON.parse(qText);
-        // Selon le format renvoyé : tableau direct ou { results: [...], count: N }
-        var rows = Array.isArray(qData) ? qData : (qData.results || qData.products || qData.items || []);
+        var rows = qData.rows || [];
         if (!rows.length) break;
+        if (sampleOnly) {
+          // Renvoie juste les 3 premières lignes brutes pour explorer les champs
+          return res.status(200).json({ count: qData.count, sample: rows.slice(0, 3), keys: Object.keys(rows[0] || {}) });
+        }
+        total = qData.count || 0;
         allProds = allProds.concat(rows);
-        var total = qData.count || qData.total || qData.found || 0;
         offset += limit;
         if (total > 0 && offset >= total) break;
         if (rows.length < limit) break;
       }
 
-      // Normalise les champs (on extrait ce qu'on peut)
+      // Normalise selon les vrais champs (à ajuster après probe)
       var normalized = allProds.map(function(r) {
         return {
-          id:    r.id || r.product_id || r.pk || 0,
-          name:  r.product_name || r.name || r.selling_name || '',
-          stock: r.stock != null ? r.stock : (r.stock_quantity != null ? r.stock_quantity : null),
-          qi:    r.qi != null ? r.qi : (r.quantity_ideal != null ? r.quantity_ideal : null),
-          rupt:  r.rupture != null ? r.rupture : (r.rupture_days != null ? r.rupture_days : (r.rupt != null ? r.rupt : null)),
-          raw:   Object.keys(r).length <= 20 ? r : undefined, // garde les clés brutes si peu nombreuses
+          id:    r.product_id || r.id || 0,
+          stock: r.stock_quantity != null ? r.stock_quantity : (r.stock != null ? r.stock : null),
+          qi:    r.quantity_ideal != null ? r.quantity_ideal : (r.qi != null ? r.qi : null),
+          rupt:  r.rupture_days != null ? r.rupture_days : (r.rupture != null ? r.rupture : (r.rupt_days != null ? r.rupt_days : null)),
         };
       });
 
-      return res.status(200).json({
-        count: normalized.length,
-        total: allProds.length,
-        sample: normalized.slice(0, 3),
-        products: normalized,
-      });
+      return res.status(200).json({ count: normalized.length, total: total, products: normalized });
 
     } else {
       return res.status(200).json({ error: 'action=list, bl, products, qiqd, probe_qiqd, commandes, fetch_kpis, save_kpis, load_kpis, probe_kpis ou debug' });
