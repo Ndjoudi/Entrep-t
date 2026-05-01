@@ -286,5 +286,12 @@
   <script src="dashboard.js"></script>
   <script src="ventes.js"></script>
   <script src="kpi_dashboard.js"></script>
+  <script>
+    // ── Démarrage ─────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+      T('kpi-dashboard'); // affiche l'onglet par défaut
+      loadData();         // charge les produits (cache → Drive → B64)
+    });
+  </script>
 </body>
 </html>
