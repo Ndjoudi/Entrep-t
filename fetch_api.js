@@ -158,6 +158,7 @@ async function uFetchProducts(opts) {
   }
 
   try {
+    const bypassToken = (typeof getBypassToken === 'function') ? getBypassToken() : '';
     let allProducts = [];
 
     for (let si = 0; si < supplierIds.length; si++) {
@@ -166,7 +167,8 @@ async function uFetchProducts(opts) {
       setStatus('Fournisseur ' + (si + 1) + '/' + supplierIds.length + ' — ' + supName + '…');
 
       // ── Page 1 ──────────────────────────────────────────────
-      const r1 = await fetch(U_PROXY + '?action=products&page=1&perPage=' + U_PER_PAGE + '&supplier=' + supId);
+      const bParam = bypassToken ? '&bypass_token=' + encodeURIComponent(bypassToken) : '';
+      const r1 = await fetch(U_PROXY + '?action=products&page=1&perPage=' + U_PER_PAGE + '&supplier=' + supId + bParam);
       const d1 = await r1.json();
 
       if (d1.error) { setStatus('❌ ' + d1.error, 'var(--r,#d32f2f)'); done(); return; }
@@ -184,7 +186,7 @@ async function uFetchProducts(opts) {
       for (let page = 2; page <= totalPages; page++) {
         if (totalFound > 0 && allProducts.length >= totalFound * (si + 1)) break;
         setStatus('Fourn. ' + (si+1) + '/' + supplierIds.length + ' — page ' + page + '/' + totalPages);
-        const r = await fetch(U_PROXY + '?action=products&page=' + page + '&perPage=' + U_PER_PAGE + '&supplier=' + supId);
+        const r = await fetch(U_PROXY + '?action=products&page=' + page + '&perPage=' + U_PER_PAGE + '&supplier=' + supId + bParam);
         const d = await r.json();
         if (d.error || !d.products || !d.products.length) break;
         allProducts = allProducts.concat(d.products);

@@ -9,6 +9,16 @@ module.exports = async function handler(req, res) {
     const tokenMatch = cookie.match(/api_token=([^;]+)/);
     const apiToken = tokenMatch ? tokenMatch[1].trim() : cookie.trim();
 
+    const bypassToken = process.env.LABELLEVIE_BYPASS_TOKEN || req.query.bypass_token || '';
+    const headersLBV = {
+      'Authorization': 'Token ' + apiToken,
+      'X-Api-Bypass-Token': bypassToken,
+      'Origin': 'https://products.app.deleev.com',
+      'Referer': 'https://products.app.deleev.com/',
+      'User-Agent': 'Mozilla/5.0',
+      'Accept': 'application/json',
+    };
+
     const action = req.query.action || '';
     const pk = req.query.pk || '';
     const page = parseInt(req.query.page) || 1;
@@ -366,23 +376,17 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(results);
 
     } else if (action === 'probe_qiqd') {
-      // ── Probe : teste plusieurs patterns d'API pour trouver le bon endpoint ──
+      // ── Probe : maintenant qu'on connaît l'URL, teste juste api.labellevie.com ──
       var supplierId = req.query.supplier || '191';
-      var qs = '?center_id=9&offset=0&limit=5&order=product_name&supplier_id=' + supplierId + '&not_order=0&not_order_sold=0&disponibility=order';
+      var qs = '?center_id=9&offset=0&limit=3&order=product_name&supplier_id=' + supplierId + '&not_order=0&not_order_sold=0&has_stock=1&disponibility=order';
       var candidates = [
-        'https://products.app.deleev.com/api/products-qiqd/' + qs,
-        'https://products.app.deleev.com/api/products/' + qs,
-        'https://products.app.deleev.com/api/qiqd/' + qs,
-        'https://admin.deleev.com/api/products-qiqd/' + qs,
-        'https://admin.deleev.com/api/v1/products-qiqd/' + qs,
-        'https://admin.deleev.com/products/qiqd/api/' + qs,
-        'https://products.app.deleev.com/products-qiqd' + qs,  // original (déjà testé)
+        'https://api.labellevie.com/1.0/api/labellevie/products-qiqd' + qs,
       ];
       var results = [];
       for (var ci = 0; ci < candidates.length; ci++) {
         var cUrl = candidates[ci];
         try {
-          var cResp = await fetch(cUrl, { headers: headers, redirect: 'follow' });
+          var cResp = await fetch(cUrl, { headers: headersLBV, redirect: 'follow' });
           var cText = await cResp.text();
           var cIsJson = cText.trim().startsWith('{') || cText.trim().startsWith('[');
           var cParsed = null;
@@ -416,7 +420,7 @@ module.exports = async function handler(req, res) {
         var qUrl = BASE_QIQD + '?center_id=9&offset=' + offset + '&limit=' + limit +
           '&order=product_name&supplier_id=' + supplierId +
           '&not_order=0&not_order_sold=0&disponibility=order';
-        var qR = await fetch(qUrl, { headers: { 'Authorization': 'Token ' + apiToken, 'User-Agent': 'Mozilla/5.0' }, redirect: 'follow' });
+        var qR = await fetch(qUrl, { headers: headersLBV, redirect: 'follow' });
         if (!qR.ok) return res.status(200).json({ error: 'HTTP ' + qR.status });
         var qText = await qR.text();
         if (!qText.trim().startsWith('{') && !qText.trim().startsWith('[')) {
