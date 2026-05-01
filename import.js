@@ -6,7 +6,7 @@ function rImport(){
   var driveHtml='<div style="margin-bottom:16px;padding:14px;background:var(--bg2);border-radius:var(--r10);border:1px solid var(--border)">';
   driveHtml+='<div style="font-size:13px;font-weight:700;margin-bottom:6px">☁️ Google Drive</div>';
   driveHtml+='<div style="font-size:12px;color:var(--text3);margin-bottom:10px">Les données sont chargées automatiquement depuis Google Drive au démarrage.</div>';
-  driveHtml+='<button class="btn pri" onclick="document.getElementById(\'dinfo\').textContent=\'Rechargement...\';loadFromDrive(\'https://corsproxy.io/?https://drive.google.com/uc?export=download&id=19fxex1glSbhNf-wxzRADYUAkI6FeA6Sk\',false)">🔄 Recharger depuis Drive</button>';
+  driveHtml+='<button class="btn pri" onclick="document.getElementById(\'dinfo\').textContent=\'Rechargement...\';loadFromDrive(false)">🔄 Recharger depuis Drive</button>';
   driveHtml+='</div>';
 
   // ── Bloc API Deleev ──────────────────────────────────────
@@ -15,7 +15,7 @@ function rImport(){
   driveHtml+='<div style="font-size:12px;color:var(--text3);margin-bottom:10px">';
   driveHtml+='Si P est chargé : <b>met à jour QI + stock</b> par ID. Sinon : <b>chargement complet</b> (zonage et famille non disponibles via API).';
   driveHtml+='</div>';
-  driveHtml+='<button id="uProdBtn" class="btn pri" onclick="uFetchProducts()">📦 Charger / Rafraîchir depuis l\'API</button>';
+  driveHtml+='<button id="uProdBtn" class="btn pri" onclick="uFetchProductsImport()">📦 Charger / Rafraîchir depuis l\'API</button>';
   driveHtml+='<div id="uProdStatus" style="display:none;font-size:11px;margin-top:6px"></div>';
   driveHtml+='<div id="uProdProgress" style="display:none;margin-top:6px">';
   driveHtml+='<div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">';
