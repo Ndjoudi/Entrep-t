@@ -1,5 +1,80 @@
 // ── fetch_api.js — Chargement produits via API Deleev ────────────────────────
 
+// ── Cache QIQD : { product_id → { stock, qi, qd, rupt, inStock, ... } } ──────
+window.QIQD = {};  // mis à jour par uFetchQIQD()
+
+// ── Fetch QIQD (stock + rupture temps réel) pour les fournisseurs actifs ──────
+async function uFetchQIQD(opts) {
+  opts = opts || {};
+  const supplierIds = opts.supplierIds && opts.supplierIds.length
+    ? opts.supplierIds
+    : (typeof getActiveFournIds === 'function' ? getActiveFournIds() : ['191']);
+
+  const statusEl  = opts.statusEl  || null;
+  const btnEl     = opts.btnEl     || null;
+  const bypassToken = (typeof getBypassToken === 'function') ? getBypassToken() : '';
+
+  function setStatus(msg, color) {
+    if (statusEl) { statusEl.style.display='block'; statusEl.textContent=msg; statusEl.style.color=color||'var(--accent,#1976d2)'; }
+  }
+
+  if (!bypassToken) { setStatus('⚠️ Token manquant — configurez dans l\'onglet Fournisseurs', 'var(--o,#f57c00)'); return; }
+  if (location.hostname==='localhost'||location.hostname==='127.0.0.1') { setStatus('⚠️ API disponible uniquement sur Vercel', 'var(--o,#f57c00)'); return; }
+  if (btnEl) btnEl.disabled = true;
+
+  try {
+    var totalLoaded = 0;
+    for (var si = 0; si < supplierIds.length; si++) {
+      var supId = supplierIds[si];
+      var supName = (typeof NAV_SUPPLIERS !== 'undefined' && NAV_SUPPLIERS[supId]) || ('#' + supId);
+      setStatus('QIQD ' + (si+1) + '/' + supplierIds.length + ' — ' + supName + '…');
+
+      var offset = 0, limit = 500, pageTotal = 0, maxIter = 50;
+      while (maxIter-- > 0) {
+        var url = U_PROXY + '?action=qiqd&supplier=' + supId + '&offset=' + offset + '&limit=' + limit
+                + '&bypass_token=' + encodeURIComponent(bypassToken);
+        var r = await fetch(url);
+        var d = await r.json();
+        if (d.error) { setStatus('❌ ' + d.error, 'var(--r,#d32f2f)'); break; }
+        var prods = d.products || [];
+        prods.forEach(function(p) { window.QIQD[p.id] = p; });
+        totalLoaded += prods.length;
+        pageTotal = d.total || 0;
+        offset += limit;
+        if (pageTotal > 0 && offset >= pageTotal) break;
+        if (prods.length < limit) break;
+        await new Promise(function(res){ setTimeout(res, 60); });
+      }
+    }
+
+    // Applique sur P si chargé
+    if (typeof P !== 'undefined' && P && P.length) {
+      var updated = 0;
+      P.forEach(function(p) {
+        var q = window.QIQD[p.id];
+        if (!q) return;
+        p.st  = q.stock != null ? q.stock : p.st;
+        p.q   = q.qi   != null ? q.qi    : p.q;
+        p.rupt = q.rupt;      // jours de rupture 30j
+        updated++;
+      });
+      if (typeof computeAlerts  === 'function') computeAlerts();
+      if (typeof updateBadge    === 'function') updateBadge();
+      if (typeof rKpiDashboard  === 'function') rKpiDashboard();
+    }
+
+    var msg = '✅ QIQD : ' + totalLoaded + ' produits (' + supplierIds.length + ' fournisseur(s))';
+    setStatus(msg, 'var(--g,#388e3c)');
+    if (typeof showToast === 'function') showToast(msg);
+
+  } catch(err) {
+    setStatus('❌ ' + err.message, 'var(--r,#d32f2f)');
+    console.error('[uFetchQIQD]', err);
+  }
+
+  if (btnEl) btnEl.disabled = false;
+}
+
 const U_PROXY = '/api/su';
 const U_PER_PAGE = 500;
 

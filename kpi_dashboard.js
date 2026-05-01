@@ -63,9 +63,17 @@ function kdComputeData() {
     if (!data[z].abc[abc]) data[z].abc[abc] = mkNode();
     if ((p.q || 0) <= 0) return;
 
-    var hasSt   = (p.st || 0) > 0;
-    var rupDays = dvIdx[String(p.id)]; // undefined si absent de DV
-    // QI réel : QI >= 1 ET rupture < 30j (si absent de DV, on l'inclut par défaut)
+    var hasSt = (p.st || 0) > 0;
+    // Priorité : données QIQD API (champ rupt) → sinon DV → sinon inclus par défaut
+    var rupDays;
+    if (typeof window !== 'undefined' && window.QIQD && window.QIQD[p.id] && window.QIQD[p.id].rupt != null) {
+      rupDays = window.QIQD[p.id].rupt;
+    } else if (p.rupt != null) {
+      rupDays = p.rupt;
+    } else {
+      rupDays = dvIdx[String(p.id)]; // undefined si absent des deux sources
+    }
+    // QI réel : rupture < 30j (si aucune source, inclus par défaut)
     var isQiReel = (rupDays === undefined || rupDays < 30);
 
     function acc(node) {

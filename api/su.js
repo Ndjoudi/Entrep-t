@@ -440,13 +440,20 @@ module.exports = async function handler(req, res) {
         if (rows.length < limit) break;
       }
 
-      // Normalise selon les vrais champs (à ajuster après probe)
+      // Normalise avec les vrais champs de l'API
       var normalized = allProds.map(function(r) {
         return {
-          id:    r.product_id || r.id || 0,
-          stock: r.stock_quantity != null ? r.stock_quantity : (r.stock != null ? r.stock : null),
-          qi:    r.quantity_ideal != null ? r.quantity_ideal : (r.qi != null ? r.qi : null),
-          rupt:  r.rupture_days != null ? r.rupture_days : (r.rupture != null ? r.rupture : (r.rupt_days != null ? r.rupt_days : null)),
+          id:      r.product_id,
+          stock:   r.stock,           // stock actuel
+          qi:      r.current_qi,      // QI actuel
+          qd:      r.current_qd,      // QD actuel
+          rupt:    r.rupture,         // jours de rupture sur 30j
+          inStock: r.in_stock,        // jours en stock sur 30j
+          rupt90:  r.rupture90,       // jours de rupture sur 90j
+          sale7:   r.sale7,
+          sale30:  r.sale30,
+          area:    r.area,
+          zone:    r.zone,
         };
       });
 
