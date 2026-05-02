@@ -212,27 +212,24 @@ async function kfLoadJ1() {
 async function kfRefresh() {
   try {
     var rows = await kfLoad();
-    _kfRows  = rows;
+    _kfRows   = rows;
     _kfLoaded = true;
-    kfRenderSection();
   } catch(err) {
-    var st = document.getElementById('kfStatus');
-    if (st) { st.textContent = '❌ ' + err.message; st.style.color = 'var(--r,#d32f2f)'; st.style.display = 'block'; }
+    console.error('kfRefresh:', err);
   }
+  kfRenderSection(); // toujours appelé, même en cas d'erreur
 }
 
 // ── Point d'entrée onglet KPI Sec ────────────────────────
 function rKpiSec() {
   var el = document.getElementById('kpi-sec-page');
   if (!el) return;
-  // Injecte le conteneur principal si pas encore fait
-  if (!el.querySelector('#kf-section')) {
-    el.innerHTML = '<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">'
-      + '<div style="overflow:auto;flex:1;padding:0 0 40px 0">'
-      + '<div id="kf-section"></div>'
-      + '</div></div>';
-  }
-  kfRefresh();
+  el.innerHTML = '<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">'
+    + '<div style="overflow:auto;flex:1;padding:0 0 40px 0">'
+    + '<div id="kf-section"></div>'
+    + '</div></div>';
+  kfRenderSection(); // affiche immédiatement l'état vide + boutons
+  kfRefresh();       // charge depuis Google Sheets en arrière-plan
 }
 
 // Init appelé depuis le dashboard (placeholder #kf-section dans kdBuildPage)
