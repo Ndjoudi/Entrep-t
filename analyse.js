@@ -12,10 +12,21 @@ var anStSort={col:'surplus',dir:-1};
 var anCurTab='stock';
 
 function anInit(){
-  if(!P.length){
-    document.getElementById('an-content').innerHTML='<div class="an-no-data">Aucune donnée — importez un CSV d\'abord.</div>';
+  // Affiche/masque le message "pas de données" sans détruire la structure DOM
+  var noData = document.getElementById('an-no-data-msg');
+  if (!noData) {
+    noData = document.createElement('div');
+    noData.id = 'an-no-data-msg';
+    noData.className = 'an-no-data';
+    noData.textContent = 'Aucune donnée — importez un CSV d\'abord.';
+    var content = document.getElementById('an-content');
+    if (content) content.insertBefore(noData, content.firstChild);
+  }
+  if (!P.length) {
+    noData.style.display = 'block';
     return;
   }
+  noData.style.display = 'none';
   anRenderAll();
   switchAnTab(anCurTab);
 }
