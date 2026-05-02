@@ -48,6 +48,7 @@ function rKpiDashboard() {
     return;
   }
   el.innerHTML = kdBuildPage();
+  if (typeof kfInit === 'function') kfInit();
 }
 
 // ── Index DV ─────────────────────────────────────────────
@@ -264,6 +265,9 @@ function kdBuildPage() {
 
   // ── Timeline équipe aujourd'hui ──────────────────────────
   h += kdBuildTodayTimeline();
+
+  // ── KPI Frais (placeholder rempli par kfInit()) ──────────
+  h += '<div id="kf-section"></div>';
 
   // Récupère les supIds présents dans P (dans l'ordre d'apparition)
   var supIds = [];
