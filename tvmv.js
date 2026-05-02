@@ -354,7 +354,7 @@ function T(tab){
     if(p.classList.contains('active'))_scrollPos[p.id]=p.scrollTop;
   });
 
-  const tabs=['kpi-dashboard','dash','plan','allee','fournisseurs','etiquettes','analyse','ventes','planning','parametres'];
+  const tabs=['kpi-dashboard','dash','plan','allee','fournisseurs','etiquettes','analyse','ventes','planning','kpi-sec','parametres'];
   document.querySelectorAll('.nb').forEach((b,i)=>b.classList.toggle('active',tabs[i]===tab));
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(tab+'-page').classList.add('active');
@@ -367,6 +367,7 @@ function T(tab){
   else if(tab==='analyse')anInit();
   else if(tab==='kpi-dashboard')rKpiDashboard();
   else if(tab==='planning')rPlanning();
+  else if(tab==='kpi-sec')rKpiSec();
   else if(tab==='parametres')rParametres();
 
   // Restaure le scroll après le rendu

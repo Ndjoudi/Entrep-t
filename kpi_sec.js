@@ -223,13 +223,20 @@ async function kfRefresh() {
 // ── Point d'entrée onglet KPI Sec ────────────────────────
 function rKpiSec() {
   var el = document.getElementById('kpi-sec-page');
-  if (!el) return;
-  el.innerHTML = '<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">'
-    + '<div style="overflow:auto;flex:1;padding:0 0 40px 0">'
-    + '<div id="kf-section"></div>'
-    + '</div></div>';
-  kfRenderSection(); // affiche immédiatement l'état vide + boutons
-  kfRefresh();       // charge depuis Google Sheets en arrière-plan
+  if (!el) { console.error('[kpi_sec] #kpi-sec-page introuvable'); return; }
+
+  // Test visuel direct — si ce texte n'apparaît pas, problème CSS/page
+  el.innerHTML = '<div style="padding:20px;font-size:14px;color:#1976d2;font-weight:700">⏳ Chargement KPI Sec…</div>'
+    + '<div id="kf-section" style="padding:0 20px;overflow-y:auto;flex:1"></div>';
+
+  try {
+    kfRenderSection();
+  } catch(e) {
+    console.error('[kpi_sec] kfRenderSection error:', e);
+    document.getElementById('kf-section').innerHTML = '<div style="padding:20px;color:red;font-weight:bold">❌ Erreur: ' + e.message + '</div>';
+  }
+
+  kfRefresh();
 }
 
 // Init appelé depuis le dashboard (placeholder #kf-section dans kdBuildPage)
