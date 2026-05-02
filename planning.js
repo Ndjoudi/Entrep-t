@@ -173,55 +173,93 @@ function plBuildPage() {
 function plNav(offset) { _plWeek = plWeekOffset(_plWeek, offset); rPlanning(); }
 function plGoToday()   { _plWeek = plISOWeek(new Date()); rPlanning(); }
 
-// ── Capture → presse-papiers ──────────────────────────────
+// ── Capture → modale image ────────────────────────────────
 function plCapture() {
   var zone = document.getElementById('pl-capture-zone');
   var btn  = document.getElementById('pl-capture-btn');
   if (!zone) return;
-  if (!window.html2canvas) { if (btn) btn.textContent = '❌ html2canvas manquant'; return; }
+  if (!window.html2canvas) {
+    if (btn) { btn.textContent = '❌ Librairie manquante'; setTimeout(function(){ btn.textContent = '📸 Copier'; }, 2000); }
+    return;
+  }
 
   if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
 
-  // Masque temporairement les boutons d'action dans les cartes pendant la capture
+  // Masque les boutons/icônes d'action pendant la capture
   var actionBtns = zone.querySelectorAll('button');
+  var grabIcons  = [];
+  zone.querySelectorAll('[draggable]').forEach(function(el) {
+    var span = el.querySelector('span');
+    if (span && span.textContent.startsWith('☰')) {
+      span.dataset._orig = span.textContent;
+      span.textContent   = span.textContent.replace('☰ ', '');
+      grabIcons.push(span);
+    }
+  });
   actionBtns.forEach(function(b) { b.style.visibility = 'hidden'; });
-  // Masque aussi le curseur ☰ (garde juste le nom)
-  var grabs = zone.querySelectorAll('[draggable]');
-  grabs.forEach(function(el) { el.style.cursor = 'default'; });
 
   html2canvas(zone, {
-    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg') || '#ffffff',
+    backgroundColor: '#ffffff',
     scale: 2,
     useCORS: true,
     logging: false,
-    scrollX: 0,
-    scrollY: 0,
   }).then(function(canvas) {
-    // Restore visibility
+    // Restaure
     actionBtns.forEach(function(b) { b.style.visibility = ''; });
-    grabs.forEach(function(el) { el.style.cursor = 'grab'; });
+    grabIcons.forEach(function(s) { if (s.dataset._orig) s.textContent = s.dataset._orig; });
+    if (btn) { btn.textContent = '📸 Copier'; btn.disabled = false; }
 
+    var dataUrl = canvas.toDataURL('image/png');
+
+    // Tente clipboard API (fonctionne en HTTPS / navigateurs modernes)
     canvas.toBlob(function(blob) {
-      navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
-        .then(function() {
-          if (btn) { btn.textContent = '✓ Copié !'; btn.style.color = 'var(--g,#388e3c)'; btn.style.fontWeight = '700'; }
-          setTimeout(function() {
-            if (btn) { btn.textContent = '📸 Copier'; btn.style.color = ''; btn.style.fontWeight = ''; btn.disabled = false; }
-          }, 2500);
-        })
-        .catch(function() {
-          // Fallback : téléchargement si le presse-papiers est refusé
-          var a = document.createElement('a');
-          a.href = canvas.toDataURL('image/png');
-          a.download = 'planning_' + _plWeek + '.png';
-          a.click();
-          if (btn) { btn.textContent = '📸 Copier'; btn.disabled = false; }
-        });
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
+          .then(function() { plShowCaptureModal(dataUrl, true); })
+          .catch(function()  { plShowCaptureModal(dataUrl, false); });
+      } else {
+        plShowCaptureModal(dataUrl, false);
+      }
     }, 'image/png');
-  }).catch(function() {
+
+  }).catch(function(err) {
     actionBtns.forEach(function(b) { b.style.visibility = ''; });
-    if (btn) { btn.textContent = '❌ Erreur'; btn.disabled = false; setTimeout(function(){ btn.textContent = '📸 Copier'; }, 2000); }
+    grabIcons.forEach(function(s) { if (s.dataset._orig) s.textContent = s.dataset._orig; });
+    if (btn) { btn.textContent = '📸 Copier'; btn.disabled = false; }
+    console.error('html2canvas error', err);
   });
+}
+
+function plShowCaptureModal(dataUrl, copied) {
+  var ex = document.getElementById('pl-img-modal'); if (ex) ex.remove();
+  var modal = document.createElement('div');
+  modal.id = 'pl-img-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box';
+
+  var notice = copied
+    ? '<div style="margin-bottom:10px;padding:8px 18px;background:#e8f5e9;color:#2e7d32;border-radius:8px;font-size:13px;font-weight:600">✓ Image copiée — colle directement dans ta messagerie (Ctrl+V / Cmd+V)</div>'
+    : '<div style="margin-bottom:10px;padding:8px 18px;background:#fff8e1;color:#f57c00;border-radius:8px;font-size:13px;font-weight:600">Clic droit sur l\'image → "Copier l\'image" puis colle dans ta messagerie</div>';
+
+  var h = '<div style="display:flex;flex-direction:column;align-items:center;gap:0;max-width:100%;max-height:100%">';
+  h += notice;
+  h += '<div style="position:relative;width:100%">';
+  h += '<img src="' + dataUrl + '" style="max-width:90vw;max-height:75vh;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.4);display:block;margin:0 auto">';
+  h += '</div>';
+  h += '<div style="display:flex;gap:10px;margin-top:12px">';
+  h += '<button onclick="plDownloadCapture(\'' + dataUrl + '\')" style="padding:8px 18px;border:none;border-radius:8px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;font-size:13px">⬇ Télécharger</button>';
+  h += '<button onclick="document.getElementById(\'pl-img-modal\').remove()" style="padding:8px 18px;border:none;border-radius:8px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;font-size:13px">✕ Fermer</button>';
+  h += '</div></div>';
+
+  modal.innerHTML = h;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+}
+
+function plDownloadCapture(dataUrl) {
+  var a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'planning_' + _plWeek + '.png';
+  a.click();
 }
 
 // ── Add entry modal ───────────────────────────────────────
