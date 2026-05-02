@@ -255,8 +255,11 @@ function kdBuildPage() {
   }
   h += '</div>';
 
-  // Corps : un tableau par fournisseur
+  // Corps
   h += '<div style="overflow:auto;flex:1;padding:0 0 40px 0">';
+
+  // ── Timeline équipe aujourd'hui ──────────────────────────
+  h += kdBuildTodayTimeline();
 
   // Récupère les supIds présents dans P (dans l'ordre d'apparition)
   var supIds = [];
@@ -383,4 +386,127 @@ function kdOpenAbc(zoneName, abc, supId) {
   modal.innerHTML = h;
   document.body.appendChild(modal);
   modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+}
+
+// ── Planning du jour — timeline ───────────────────────────
+function kdParseSlotTime(label) {
+  var parts = label.split(/\s*[-–]\s*/);
+  if (parts.length < 2) return null;
+  function parseT(s) {
+    var m = s.trim().match(/^(\d+)h(\d*)/i);
+    if (!m) return null;
+    return parseInt(m[1]) * 60 + (m[2] ? parseInt(m[2]) : 0);
+  }
+  var start = parseT(parts[0]);
+  var end   = parseT(parts[1]);
+  if (start === null || end === null) return null;
+  return { start: start, end: end };
+}
+
+function kdBuildTodayTimeline() {
+  if (typeof plGet !== 'function' || typeof plISOWeek !== 'function' || typeof plCellKey !== 'function') return '';
+
+  var PL_START = 7  * 60;  // 7h
+  var PL_END   = 23 * 60;  // 23h
+  var PL_RANGE = PL_END - PL_START;
+
+  var today    = new Date();
+  var weekStr  = plISOWeek(today);
+  var dayIdx   = (today.getDay() + 6) % 7;
+  var planData = plGet();
+  var weekData = planData.weeks[weekStr];
+  if (!weekData) return '';
+
+  var DAYS   = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+  var MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var dayLabel = DAYS[dayIdx] + ' ' + today.getDate() + ' ' + MONTHS[today.getMonth()];
+
+  // Collecte les entrées du jour groupées
+  var rows = [];
+  var groups = planData.groups || [];
+  var slots  = planData.slots  || [];
+  groups.forEach(function(group) {
+    var key  = plCellKey(dayIdx, group);
+    var cell = weekData[key] || [];
+    if (!cell.length) return;
+    rows.push({ type: 'group', label: group });
+    cell.forEach(function(e) {
+      var slotDef = slots.find(function(s) { return s.label === e.slot; });
+      var color   = slotDef ? slotDef.color : '#888';
+      var times   = kdParseSlotTime(e.slot);
+      if (!times) return;
+      rows.push({ type: 'entry', emp: e.emp, slot: e.slot, color: color,
+                  startMin: times.start, endMin: times.end });
+    });
+  });
+
+  if (!rows.some(function(r) { return r.type === 'entry'; })) return '';
+
+  // Heure actuelle
+  var nowMin      = today.getHours() * 60 + today.getMinutes();
+  var nowInRange  = nowMin >= PL_START && nowMin <= PL_END;
+  var nowPct      = (nowMin - PL_START) / PL_RANGE * 100;
+  var nowHLabel   = today.getHours() + 'h' + (today.getMinutes() ? String(today.getMinutes()).padStart(2,'0') : '');
+
+  var NAME_W = 88; // px
+
+  var h = '<div style="border-bottom:1px solid var(--border);padding-bottom:16px">';
+
+  // Section header
+  h += '<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px">';
+  h += '<span style="font-size:13px;font-weight:700">👥 Équipe aujourd\'hui</span>';
+  h += '<span style="font-size:11px;color:var(--text3)">' + dayLabel + '</span>';
+  if (nowInRange) {
+    h += '<span style="font-size:11px;background:var(--rbg,#ffebee);color:var(--r,#d32f2f);border-radius:20px;padding:1px 8px">● ' + nowHLabel + '</span>';
+  }
+  h += '</div>';
+
+  h += '<div style="padding:0 16px">';
+
+  // Ligne des heures
+  h += '<div style="margin-left:' + NAME_W + 'px;position:relative;height:16px;margin-bottom:2px">';
+  for (var hh = 7; hh <= 23; hh += 2) {
+    var pct = (hh * 60 - PL_START) / PL_RANGE * 100;
+    h += '<div style="position:absolute;left:' + pct + '%;font-size:9px;color:var(--text3);transform:translateX(-50%);white-space:nowrap">' + hh + 'h</div>';
+  }
+  h += '</div>';
+
+  // Lignes employés
+  rows.forEach(function(row) {
+    if (row.type === 'group') {
+      h += '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin:6px 0 2px 0">' + row.label + '</div>';
+      return;
+    }
+    var barLeft  = Math.max(0, (row.startMin - PL_START) / PL_RANGE * 100);
+    var barWidth = Math.min(100 - barLeft, (row.endMin - row.startMin) / PL_RANGE * 100);
+    var sH = Math.floor(row.startMin/60)+'h'+(row.startMin%60?String(row.startMin%60).padStart(2,'0'):'');
+    var eH = Math.floor(row.endMin/60)  +'h'+(row.endMin%60  ?String(row.endMin%60).padStart(2,'0')  :'');
+
+    h += '<div style="display:flex;align-items:center;margin-bottom:4px">';
+    // Nom
+    h += '<div style="width:' + NAME_W + 'px;font-size:11px;font-weight:600;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;color:var(--text)">' + row.emp + '</div>';
+    // Track
+    h += '<div style="flex:1;height:20px;position:relative;border-radius:4px;overflow:visible">';
+    // Grille verticale légère
+    for (var gh = 7; gh <= 23; gh += 2) {
+      var gPct = (gh * 60 - PL_START) / PL_RANGE * 100;
+      h += '<div style="position:absolute;top:0;bottom:0;left:' + gPct + '%;width:1px;background:var(--border);opacity:.5"></div>';
+    }
+    // Barre colorée
+    h += '<div title="' + row.slot + '" style="position:absolute;top:2px;bottom:2px;left:' + barLeft + '%;width:' + barWidth + '%;background:' + row.color + ';border-radius:3px;display:flex;align-items:center;justify-content:center;min-width:4px;overflow:hidden">';
+    if (barWidth > 8) {
+      h += '<span style="font-size:9px;color:#fff;font-weight:600;white-space:nowrap;padding:0 5px">' + sH + '–' + eH + '</span>';
+    }
+    h += '</div>';
+    // Ligne "maintenant"
+    if (nowInRange) {
+      h += '<div style="position:absolute;top:-3px;bottom:-3px;left:' + nowPct + '%;width:2px;background:var(--r,#d32f2f);border-radius:1px;z-index:3"></div>';
+    }
+    h += '</div>'; // track
+    h += '</div>'; // row
+  });
+
+  h += '</div>'; // padding
+  h += '</div>'; // widget
+  return h;
 }
