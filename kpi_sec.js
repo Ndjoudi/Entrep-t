@@ -1,4 +1,4 @@
-// ── KPI Frais ─────────────────────────────────────────────
+// ── KPI Sec ───────────────────────────────────────────────
 // Données quotidiennes depuis Deleev admin → Google Sheets
 // Affichage filtré selon les fournisseurs actifs (getActiveFournIds)
 
@@ -132,6 +132,55 @@ async function kfLoad() {
 }
 
 // ── Actions boutons ───────────────────────────────────────
+
+// Charge une plage de dates jour par jour
+async function kfLoadPeriod() {
+  var minEl = document.getElementById('kfDateMin');
+  var maxEl = document.getElementById('kfDateMax');
+  if (!minEl || !maxEl || !minEl.value || !maxEl.value) return;
+
+  var dateMin = minEl.value;
+  var dateMax = maxEl.value;
+  if (dateMin > dateMax) { var tmp = dateMin; dateMin = dateMax; dateMax = tmp; }
+
+  function setStatus(msg, color) {
+    var st = document.getElementById('kfStatus');
+    if (!st) return;
+    st.textContent   = msg;
+    st.style.color   = color || 'var(--accent,#1976d2)';
+    st.style.display = 'block';
+  }
+
+  // Construit la liste des jours
+  var days = [], cur = new Date(dateMin + 'T12:00:00');
+  var end  = new Date(dateMax + 'T12:00:00');
+  while (cur <= end) {
+    days.push(cur.toISOString().split('T')[0]);
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Charge les données existantes pour éviter les doublons
+  var existingDates = {};
+  _kfRows.forEach(function(r) { existingDates[r.date] = true; });
+
+  var ok = 0, skip = 0, err = 0;
+  for (var i = 0; i < days.length; i++) {
+    var ds = days[i];
+    setStatus('⏳ ' + ds + ' (' + (i + 1) + '/' + days.length + ') — ✅ ' + ok + ' · ⏭ ' + skip + ' · ❌ ' + err);
+    if (existingDates[ds]) { skip++; continue; }
+    try {
+      var kpis = await kfFetchForDate(ds);
+      await kfSave(kpis);
+      existingDates[ds] = true;
+      ok++;
+    } catch(e) { err++; }
+  }
+
+  try { await fetch(KF_PROXY + '?action=trim_kpis&keep=90'); } catch(e) {}
+  setStatus('✅ Terminé — ' + ok + ' chargés · ' + skip + ' déjà présents · ' + err + ' erreurs', 'var(--g,#2e7d32)');
+  await kfRefresh();
+}
+
 async function kfLoadJ1() {
   function setStatus(msg, color) {
     var st = document.getElementById('kfStatus');
@@ -284,7 +333,7 @@ function kfRenderSection() {
 
   // ── Header ──
   h += '<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
-  h += '<span style="font-size:13px;font-weight:700">📈 KPI Frais</span>';
+  h += '<span style="font-size:13px;font-weight:700">📈 KPI Sec</span>';
 
   if (_kfLoaded && _kfRows.length) {
     h += '<span style="font-size:11px;color:var(--text3)">' + _kfRows.length + ' jours</span>';
@@ -300,9 +349,22 @@ function kfRenderSection() {
     h += '</div>';
   }
 
-  h += '<button onclick="kfLoadJ1()" style="margin-left:auto;font-size:11px;padding:4px 12px;border-radius:6px;'
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap">';
+  // Champ date début / fin + bouton période
+  var defMax = (function(){ var d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; })();
+  var defMin = (function(){ var d=new Date(); d.setDate(d.getDate()-30); return d.toISOString().split('T')[0]; })();
+  var inputStyle = 'font-family:\'Geist Mono\',monospace;font-size:10px;background:var(--surface);border:1px solid var(--border);'
+                 + 'color:var(--text);padding:3px 6px;border-radius:5px;outline:none';
+  h += '<input type="date" id="kfDateMin" value="' + defMin + '" style="' + inputStyle + '">';
+  h += '<span style="font-size:10px;color:var(--text3)">→</span>';
+  h += '<input type="date" id="kfDateMax" value="' + defMax + '" style="' + inputStyle + '">';
+  h += '<button onclick="kfLoadPeriod()" style="font-size:11px;padding:4px 10px;border-radius:6px;'
+     + 'border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer">📥 Charger</button>';
+  // Bouton J-1 rapide
+  h += '<button onclick="kfLoadJ1()" style="font-size:11px;padding:4px 10px;border-radius:6px;'
      + 'border:1px solid var(--accent,#1976d2);background:var(--surface);color:var(--accent,#1976d2);cursor:pointer;font-weight:600">'
-     + '📥 Charger J-1</button>';
+     + 'J-1</button>';
+  h += '</div>';
   h += '</div>';
 
   // Status
@@ -312,7 +374,7 @@ function kfRenderSection() {
   // Pas de données
   if (!_kfLoaded || !_kfRows.length) {
     h += '<div style="padding:16px 16px 20px;color:var(--text3);font-size:12px">'
-       + 'Aucune donnée KPI Frais — cliquez sur "Charger J-1" pour démarrer.</div>';
+       + 'Aucune donnée KPI Sec — cliquez sur "Charger J-1" pour démarrer.</div>';
     h += '</div>';
     el.innerHTML = h;
     return;
@@ -344,7 +406,7 @@ function kfRenderSection() {
 
   var cards = [
     { lbl:'CA TTC · 7j',      val:kfFE(w1.ca_ttc),       delta:cardD(w1.ca_ttc,       w0.ca_ttc,       false), col:'var(--accent,#1976d2)' },
-    { lbl:'CA HT Frais · 7j', val:kfFE(w1.ca_ht_frais),  delta:cardD(w1.ca_ht_frais,  w0.ca_ht_frais,  false), col:'var(--g,#2e7d32)' },
+    { lbl:'CA HT Sec · 7j',   val:kfFE(w1.ca_ht_frais),  delta:cardD(w1.ca_ht_frais,  w0.ca_ht_frais,  false), col:'var(--g,#2e7d32)' },
     { lbl:'DLC Sorti · 7j',   val:kfFE(w1.montant_dlc),  delta:cardD(w1.montant_dlc,  w0.montant_dlc,  true),  col:'var(--o,#f57c00)' },
     { lbl:'Coûts Zone · 7j',  val:kfFE(w1.couts),        delta:cardD(w1.couts,        w0.couts,        true),  col:'var(--text)' },
     { lbl:'Tps Picking · 7j', val:kfFT(Math.round(w1.tps)), delta:cardD(w1.tps,       w0.tps,          true),  col:'var(--text)' },
@@ -393,7 +455,7 @@ function kfRenderSection() {
 
   // ── Mini graphique CA HT Frais ──
   var chartRows = kfAggregate(_kfRows, _kfFilter).slice().reverse();
-  var chartHTML = kfBuildChart(chartRows, 'ca_ht_frais', 'CA HT Frais · évolution');
+  var chartHTML = kfBuildChart(chartRows, 'ca_ht_frais', 'CA HT Sec · évolution');
   if (chartHTML) h += '<div style="padding:0 16px 14px">' + chartHTML + '</div>';
 
   // ── Tableau ──
@@ -413,7 +475,7 @@ function kfRenderSection() {
   h += '<th style="' + th  + '">CA TTC</th>';
   h += '<th style="' + th  + '">DLC Sorti</th>';
   h += '<th style="' + th  + '">Coûts Zone</th>';
-  h += '<th style="' + th  + '">CA HT Frais</th>';
+  h += '<th style="' + th  + '">CA HT Sec</th>';
   h += '<th style="' + th  + '">% CA</th>';
   h += '<th style="' + th  + '">Items</th>';
   h += '<th style="' + th  + '">Picking</th>';
