@@ -88,11 +88,16 @@ function plBuildPage() {
     h += '<button onclick="plGoToday()" style="padding:4px 10px;border:1px solid var(--accent,#1976d2);border-radius:6px;background:transparent;cursor:pointer;font-size:12px;color:var(--accent,#1976d2)">Aujourd\'hui</button>';
   }
   h += '<div style="margin-left:auto;display:flex;gap:8px;align-items:center">';
+  h += '<button id="pl-capture-btn" onclick="plCapture()" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:12px">📸 Copier</button>';
   h += '<button onclick="plOpenDuplicate()" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:12px">⧉ Dupliquer</button>';
   h += '<label style="font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer">⬆ Import CSV<input type="file" accept=".csv" onchange="plImportCSV(this)" style="display:none"></label>';
   h += '<button onclick="plExportCSV()" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:12px">⬇ Export CSV</button>';
   h += '<button onclick="plOpenConfig()" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:12px">⚙ Config</button>';
   h += '</div></div>';
+
+  // ── Zone capturable (en-tête semaine + grille) ───────────
+  h += '<div id="pl-capture-zone" style="background:var(--bg,#fff)">';
+  h += '<div style="padding:10px 16px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">' + plWeekLabel(_plWeek) + '</div>';
 
   // ── Grid ─────────────────────────────────────────────────
   h += '<div style="overflow:auto;flex:1">';
@@ -159,12 +164,65 @@ function plBuildPage() {
     h += '</tr>';
   });
 
-  h += '</tbody></table></div></div>';
+  h += '</tbody></table></div>';
+  h += '</div>'; // fin pl-capture-zone
+  h += '</div>'; // fin wrapper principal
   return h;
 }
 
 function plNav(offset) { _plWeek = plWeekOffset(_plWeek, offset); rPlanning(); }
 function plGoToday()   { _plWeek = plISOWeek(new Date()); rPlanning(); }
+
+// ── Capture → presse-papiers ──────────────────────────────
+function plCapture() {
+  var zone = document.getElementById('pl-capture-zone');
+  var btn  = document.getElementById('pl-capture-btn');
+  if (!zone) return;
+  if (!window.html2canvas) { if (btn) btn.textContent = '❌ html2canvas manquant'; return; }
+
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+
+  // Masque temporairement les boutons d'action dans les cartes pendant la capture
+  var actionBtns = zone.querySelectorAll('button');
+  actionBtns.forEach(function(b) { b.style.visibility = 'hidden'; });
+  // Masque aussi le curseur ☰ (garde juste le nom)
+  var grabs = zone.querySelectorAll('[draggable]');
+  grabs.forEach(function(el) { el.style.cursor = 'default'; });
+
+  html2canvas(zone, {
+    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg') || '#ffffff',
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    scrollX: 0,
+    scrollY: 0,
+  }).then(function(canvas) {
+    // Restore visibility
+    actionBtns.forEach(function(b) { b.style.visibility = ''; });
+    grabs.forEach(function(el) { el.style.cursor = 'grab'; });
+
+    canvas.toBlob(function(blob) {
+      navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
+        .then(function() {
+          if (btn) { btn.textContent = '✓ Copié !'; btn.style.color = 'var(--g,#388e3c)'; btn.style.fontWeight = '700'; }
+          setTimeout(function() {
+            if (btn) { btn.textContent = '📸 Copier'; btn.style.color = ''; btn.style.fontWeight = ''; btn.disabled = false; }
+          }, 2500);
+        })
+        .catch(function() {
+          // Fallback : téléchargement si le presse-papiers est refusé
+          var a = document.createElement('a');
+          a.href = canvas.toDataURL('image/png');
+          a.download = 'planning_' + _plWeek + '.png';
+          a.click();
+          if (btn) { btn.textContent = '📸 Copier'; btn.disabled = false; }
+        });
+    }, 'image/png');
+  }).catch(function() {
+    actionBtns.forEach(function(b) { b.style.visibility = ''; });
+    if (btn) { btn.textContent = '❌ Erreur'; btn.disabled = false; setTimeout(function(){ btn.textContent = '📸 Copier'; }, 2000); }
+  });
+}
 
 // ── Add entry modal ───────────────────────────────────────
 function plOpenAdd(weekStr, dayIdx, group) {
