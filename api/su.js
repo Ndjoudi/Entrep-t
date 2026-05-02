@@ -459,8 +459,72 @@ module.exports = async function handler(req, res) {
 
       return res.status(200).json({ count: normalized.length, total: total, products: normalized });
 
+    // ── KPI Sec (Dépôt) ────────────────────────────────────
+    } else if (action === 'depot_fetch') {
+      var DEPOT_GSHEET = 'https://script.google.com/macros/s/AKfycbx5JdTIrciOCYvmS3sw9lzKIDmtvIhgoMCoTU5zQ1YahfDSdV1bG1Z_krXhbrDoPZrt/exec';
+      var dateMin = req.query.date_min || '';
+      var dateMax = req.query.date_max || '';
+      if (!dateMin || !dateMax) return res.status(200).json({ error: 'date_min et date_max requis' });
+
+      var cacheKey  = 'depot' + Date.now();
+      var dataTypes = ['stockstat', 'packingstat', 'warehousezone', 'supplier'];
+      var baseUrl   = BASE + '/stats/dashboard_ajax_stats?cache_key=' + cacheKey
+        + '&combination=and&user_type=&user_origin=&shipment_type=&payment_type='
+        + '&logistics_center_ids=9&agregation=day&date_min=' + dateMin + '&date_max=' + dateMax;
+
+      var ajaxResults = await Promise.all(dataTypes.map(async function(dt) {
+        try {
+          var r = await fetch(baseUrl + '&data_type=' + dt, { headers: headers, redirect: 'follow' });
+          if (!r.ok) return { type: dt, error: 'HTTP ' + r.status, html: '' };
+          var html = await r.text();
+          if (html.includes('FormSignin')) return { type: dt, error: 'Session expirée', html: '' };
+          return { type: dt, html: html, error: null };
+        } catch(e) { return { type: dt, error: e.message, html: '' }; }
+      }));
+
+      try {
+        var dashUrl = BASE + '/stats/dashboard_new?combination=and&user_type=&user_origin=&shipment_type=&payment_type='
+          + '&logistics_center_ids=9&agregation=day&date_min=' + dateMin + '&date_max=' + dateMax
+          + '&submit_filters=Afficher+les+stats';
+        var dR = await fetch(dashUrl, { headers: headers, redirect: 'follow' });
+        var dashHtml = dR.ok ? await dR.text() : '';
+        var trM = dashHtml.match(/<tr[^>]*id="ca_ttc"[^>]*>([\s\S]*?)<\/tr>/i);
+        var caVal = '0';
+        if (trM) {
+          var tdM = trM[1].match(/<td[^>]*class="[^"]*table-info[^"]*"[^>]*>([\s\S]*?)<\/td>/i);
+          if (tdM) { var stM = tdM[1].match(/<strong>([^<]+)<\/strong>/); if (stM) caVal = stM[1].trim(); }
+        }
+        ajaxResults.push({ type: 'dashboard', html: '<tr id="ca_ttc"><td class="ca_ttc table-info"><strong>' + caVal + '</strong></td></tr>', error: null });
+      } catch(e) { ajaxResults.push({ type: 'dashboard', error: e.message, html: '' }); }
+
+      var response = { date_min: dateMin, date_max: dateMax, data: {} };
+      ajaxResults.forEach(function(r) { response.data[r.type] = { html: r.html, error: r.error }; });
+      return res.status(200).json(response);
+
+    } else if (action === 'depot_save') {
+      var DEPOT_GSHEET = 'https://script.google.com/macros/s/AKfycbx5JdTIrciOCYvmS3sw9lzKIDmtvIhgoMCoTU5zQ1YahfDSdV1bG1Z_krXhbrDoPZrt/exec';
+      try {
+        var r = await fetch(DEPOT_GSHEET, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body) });
+        return res.status(200).json(await r.json());
+      } catch(e) { return res.status(200).json({ error: e.message }); }
+
+    } else if (action === 'depot_load') {
+      var DEPOT_GSHEET = 'https://script.google.com/macros/s/AKfycbx5JdTIrciOCYvmS3sw9lzKIDmtvIhgoMCoTU5zQ1YahfDSdV1bG1Z_krXhbrDoPZrt/exec';
+      try {
+        var r = await fetch(DEPOT_GSHEET);
+        return res.status(200).json(await r.json());
+      } catch(e) { return res.status(200).json({ error: e.message }); }
+
+    } else if (action === 'depot_trim') {
+      var DEPOT_GSHEET = 'https://script.google.com/macros/s/AKfycbx5JdTIrciOCYvmS3sw9lzKIDmtvIhgoMCoTU5zQ1YahfDSdV1bG1Z_krXhbrDoPZrt/exec';
+      var keep = parseInt(req.query.keep) || 90;
+      try {
+        var r = await fetch(DEPOT_GSHEET, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'trim', keep: keep }) });
+        return res.status(200).json(await r.json());
+      } catch(e) { return res.status(200).json({ error: e.message }); }
+
     } else {
-      return res.status(200).json({ error: 'action=list, bl, products, qiqd, probe_qiqd, commandes, fetch_kpis, save_kpis, load_kpis, probe_kpis ou debug' });
+      return res.status(200).json({ error: 'action=list, bl, products, qiqd, probe_qiqd, commandes, fetch_kpis, save_kpis, load_kpis, probe_kpis, depot_fetch, depot_save, depot_load, depot_trim ou debug' });
     }
   } catch (globalErr) {
     return res.status(200).json({ error: 'Crash: ' + globalErr.message });

@@ -2,7 +2,7 @@
 // Données quotidiennes depuis Deleev admin → Google Sheets
 // Affichage filtré selon les fournisseurs actifs (getActiveFournIds)
 
-var KF_PROXY = 'https://project-rps1u.vercel.app/api/kpi_depot'; // ← URL Vercel (fichier api/kpi_depot.js dans GitHub)
+var KF_PROXY = 'https://project-rps1u.vercel.app/api/su'; // su.js existant — actions depot_fetch/depot_save/depot_load/depot_trim
 
 var _kfRows   = [];
 var _kfFilter = 'day';   // 'day' | 'week' | 'month'
@@ -77,7 +77,7 @@ function kfParseFetchResponse(data) {
 
 // ── API calls ────────────────────────────────────────────
 async function kfFetchForDate(ds) {
-  var r = await fetch(KF_PROXY + '?action=fetch_kpis&date_min=' + ds + '&date_max=' + ds + '&agregation=day');
+  var r = await fetch(KF_PROXY + '?action=depot_fetch&date_min=' + ds + '&date_max=' + ds);
   if (!r.ok) throw new Error('HTTP ' + r.status);
   var data = await r.json();
   if (data.error) throw new Error(data.error);
@@ -107,7 +107,7 @@ async function kfSave(kpis) {
     });
     payload.suppliers = sd;
   }
-  var r = await fetch(KF_PROXY + '?action=save_kpis', {
+  var r = await fetch(KF_PROXY + '?action=depot_save', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload)
@@ -117,7 +117,7 @@ async function kfSave(kpis) {
 }
 
 async function kfLoad() {
-  var r = await fetch(KF_PROXY + '?action=load_kpis');
+  var r = await fetch(KF_PROXY + '?action=depot_load');
   if (!r.ok) throw new Error('HTTP ' + r.status);
   var res = await r.json();
   if (res.error) throw new Error(res.error);
@@ -197,7 +197,7 @@ async function kfLoadJ1() {
     var kpis = await kfFetchForDate(ds);
     setStatus('⏳ Sauvegarde dans Google Sheets…');
     await kfSave(kpis);
-    try { await fetch(KF_PROXY + '?action=trim_kpis&keep=90'); } catch(e) {}
+    try { await fetch(KF_PROXY + '?action=depot_trim&keep=90'); } catch(e) {}
     setStatus('✅ ' + ds + ' chargé !', 'var(--g,#2e7d32)');
     await kfRefresh();
     setTimeout(function() {
@@ -225,9 +225,7 @@ function rKpiSec() {
   var el = document.getElementById('kpi-sec-page');
   if (!el) { console.error('[kpi_sec] #kpi-sec-page introuvable'); return; }
 
-  // Test visuel direct — si ce texte n'apparaît pas, problème CSS/page
-  el.innerHTML = '<div style="padding:20px;font-size:14px;color:#1976d2;font-weight:700">⏳ Chargement KPI Sec…</div>'
-    + '<div id="kf-section" style="padding:0 20px;overflow-y:auto;flex:1"></div>';
+  el.innerHTML = '<div id="kf-section" style="padding:0;overflow-y:auto;flex:1"></div>';
 
   try {
     kfRenderSection();
