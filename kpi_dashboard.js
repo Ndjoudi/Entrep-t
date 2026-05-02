@@ -458,9 +458,6 @@ function kdBuildTodayTimeline() {
   h += '<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px">';
   h += '<span style="font-size:13px;font-weight:700">👥 Équipe aujourd\'hui</span>';
   h += '<span style="font-size:11px;color:var(--text3)">' + dayLabel + '</span>';
-  if (nowInRange) {
-    h += '<span style="font-size:11px;background:var(--rbg,#ffebee);color:var(--r,#d32f2f);border-radius:20px;padding:1px 8px">● ' + nowHLabel + '</span>';
-  }
   h += '</div>';
 
   h += '<div style="padding:0 16px">';
