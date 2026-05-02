@@ -102,23 +102,6 @@ function rFournisseurs() {
     html += '</div>';
   }
 
-  // ── Bouton Sync ──────────────────────────────────────────────────────────────
-  html += '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">';
-  if (activeIds.length) {
-    html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">'+activeIds.length+' fournisseur'+(activeIds.length>1?'s':'')+' actif'+(activeIds.length>1?'s':'')+' sélectionné'+(activeIds.length>1?'s':'')+' pour la synchronisation API</div>';
-  } else {
-    html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Cochez les fournisseurs à synchroniser via l\'API</div>';
-  }
-  html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-  html += '<button onclick="fSyncNow()" class="btn pri" '+(activeIds.length?'':'disabled')+' style="font-size:13px;padding:8px 20px">🔌 Stock + QI (API Deleev)</button>';
-  html += '<button onclick="fSyncQIQD()" class="btn" '+(activeIds.length?'':'disabled')+' style="font-size:13px;padding:8px 20px" title="Récupère stock, QI et jours de rupture depuis api.labellevie.com">📊 Stock + Rupture (QI/QD)</button>';
-  html += '</div>';
-  html += '<div id="fSyncStatus" style="display:none;font-size:12px;margin-top:8px;font-family:\'Geist Mono\',monospace"></div>';
-  html += '<div id="fSyncProgress" style="display:none;margin-top:8px">';
-  html += '<div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden"><div id="fSyncFill" style="height:100%;background:var(--accent,#1976d2);width:0%;transition:width .3s;border-radius:4px"></div></div>';
-  html += '<div id="fSyncText" style="font-size:10px;color:var(--text3);margin-top:3px;text-align:center;font-family:\'Geist Mono\',monospace"></div>';
-  html += '</div>';
-  html += '</div>';
 
   html += '</div>';
   el.innerHTML = html;
@@ -197,26 +180,4 @@ function fRename(i) {
   rFournisseurs();
 }
 
-function fSyncNow() {
-  var ids=getActiveFournIds();
-  if(!ids.length) return;
-  uFetchProducts({
-    supplierIds: ids,
-    statusEl:    document.getElementById('fSyncStatus'),
-    progressEl:  document.getElementById('fSyncProgress'),
-    fillEl:      document.getElementById('fSyncFill'),
-    textEl:      document.getElementById('fSyncText'),
-    btnEl:       null,
-  });
-}
-
-function fSyncQIQD() {
-  var ids=getActiveFournIds();
-  if(!ids.length) return;
-  uFetchQIQD({
-    supplierIds: ids,
-    statusEl:    document.getElementById('fSyncStatus'),
-    btnEl:       null,
-  });
-}
 
