@@ -48,7 +48,7 @@ function rKpiDashboard() {
   el.innerHTML = kdBuildPage();
 }
 
-// ── Index DV : nb jours de rupture sur les 30 derniers jours par produit ──
+// ── Index DV ─────────────────────────────────────────────
 function kdBuildDvIdx() {
   var idx = {};
   if (typeof DV === 'undefined' || !DV || !DV.groups || !DV.dates) return idx;
@@ -66,15 +66,15 @@ function kdBuildDvIdx() {
   return idx;
 }
 
-// ── Calcul données zone / ABC ─────────────────────────────
-function kdComputeData() {
+// ── Calcul données zone / ABC pour un tableau de produits donné ───────────
+function kdComputeData(prods) {
   var hasQIQD = typeof window !== 'undefined' && window.QIQD && Object.keys(window.QIQD).length > 0;
   var dvIdx   = hasQIQD ? {} : kdBuildDvIdx();
 
   var ZONE_ORDER = ['LGV','PF','Rota','Prio','Salée','Sucrée','Liquide','DPH','Frais sec','Autre'];
   var ABC_ORDER  = ['A','B','C','D'];
 
-  function mkNode() { return { withQI:0, inStock:0, qiReel:0, fam:{} }; }
+  function mkNode() { return { withQI:0, inStock:0, qiReel:0 }; }
 
   var data = {};
   ZONE_ORDER.forEach(function(z) {
@@ -83,14 +83,13 @@ function kdComputeData() {
     ABC_ORDER.forEach(function(abc) { data[z].abc[abc] = mkNode(); });
   });
 
-  P.forEach(function(p) {
+  prods.forEach(function(p) {
     var z   = zone(p.a);
     var abc = P_ABC[p.id] || 'D';
-    var fam = p.f || 'Z';
     if (!data[z]) return;
     if (!data[z].abc[abc]) data[z].abc[abc] = mkNode();
 
-    var q = hasQIQD ? window.QIQD[p.id] : null;
+    var q       = hasQIQD ? window.QIQD[p.id] : null;
     var qi      = q ? q.qi    : (p.q  || 0);
     var stock   = q ? q.stock : (p.st || 0);
     var rupDays = q ? q.rupt  : (p.rupt != null ? p.rupt : dvIdx[String(p.id)]);
@@ -108,8 +107,6 @@ function kdComputeData() {
 
     acc(data[z]);
     acc(data[z].abc[abc]);
-    if (!data[z].abc[abc].fam[fam]) data[z].abc[abc].fam[fam] = mkNode();
-    acc(data[z].abc[abc].fam[fam]);
   });
 
   return { data:data, hasQIQD:hasQIQD, ZONE_ORDER:ZONE_ORDER };
@@ -125,18 +122,17 @@ function kdPctColor(pct) {
 var _abcCol = { A: 'var(--g)', B: 'var(--o)', C: 'var(--r)', D: '#6b3fa0' };
 var _abcBg  = { A: 'var(--gbg)', B: 'var(--obg)', C: 'var(--rbg)', D: '#f3e8ff' };
 
-// Badge [A 6] — cliquable si zoneName fourni
-function kdBadge(abc, val, color, zoneName) {
-  var bg  = _abcBg[abc]  || 'var(--bg2)';
-  var col = color || _abcCol[abc] || 'var(--text)';
-  var click = zoneName
-    ? ' onclick="kdOpenAbc(\'' + zoneName.replace(/'/g, "\\'") + '\',\'' + abc + '\')" style="cursor:pointer;display:inline-flex;align-items:center;margin-left:5px;background:' + bg + ';color:' + col + ';border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;line-height:16px"'
+// Badge cliquable si zoneName + supId fournis
+function kdBadge(abc, val, color, zoneName, supId) {
+  var bg    = _abcBg[abc]  || 'var(--bg2)';
+  var col   = color || _abcCol[abc] || 'var(--text)';
+  var click = (zoneName != null)
+    ? ' onclick="kdOpenAbc(\'' + zoneName.replace(/'/g,"\\'") + '\',\'' + abc + '\',' + (supId != null ? '\'' + supId + '\'' : 'null') + ')" style="cursor:pointer;display:inline-flex;align-items:center;margin-left:5px;background:' + bg + ';color:' + col + ';border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;line-height:16px"'
     : ' style="display:inline-flex;align-items:center;margin-left:5px;background:' + bg + ';color:' + col + ';border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;line-height:16px"';
   return '<span' + click + '>' + abc + ' ' + val + '</span>';
 }
 
-// Cellule comptage avec badges cliquables
-function kdCell(total, zd, getVal, fmt, style, zoneName) {
+function kdCell(total, zd, getVal, fmt, style, zoneName, supId) {
   var s = style || 'padding:7px 14px;text-align:right;white-space:nowrap';
   var h = '<td style="' + s + '"><span style="font-weight:700">' + (fmt ? fmt(total) : total) + '</span>';
   ['A','B','C'].forEach(function(abc) {
@@ -144,13 +140,12 @@ function kdCell(total, zd, getVal, fmt, style, zoneName) {
     if (!ad || ad.withQI === 0) return;
     var v = getVal(ad);
     if (v === null || v === undefined) return;
-    h += kdBadge(abc, fmt ? fmt(v) : v, null, zoneName);
+    h += kdBadge(abc, fmt ? fmt(v) : v, null, zoneName, supId);
   });
   return h + '</td>';
 }
 
-// Cellule % rupture stock
-function kdPctStockCell(pct, zd, style, zoneName) {
+function kdPctStockCell(pct, zd, style, zoneName, supId) {
   var s   = style || 'padding:7px 14px;text-align:right;white-space:nowrap';
   var fmt = function(v) { return v.toFixed(1) + '%'; };
   var h   = '<td style="' + s + '"><span style="font-weight:700;color:' + kdPctColor(pct) + '">' + fmt(pct) + '</span>';
@@ -158,19 +153,17 @@ function kdPctStockCell(pct, zd, style, zoneName) {
     var ad = zd.abc[abc];
     if (!ad || ad.withQI === 0) return;
     var p2 = ad.withQI > 0 ? ad.inStock / ad.withQI * 100 : 0;
-    h += kdBadge(abc, fmt(p2), kdPctColor(p2), zoneName);
+    h += kdBadge(abc, fmt(p2), kdPctColor(p2), zoneName, supId);
   });
   return h + '</td>';
 }
 
-// Cellule QI réel
-function kdDvCountCell(total, zd, hasDV, style, zoneName) {
+function kdDvCountCell(total, zd, hasDV, style, zoneName, supId) {
   if (!hasDV) return '<td style="' + (style || 'padding:7px 14px;text-align:right;color:var(--text3)') + '">—</td>';
-  return kdCell(total, zd, function(ad) { return ad.qiReel; }, null, style, zoneName);
+  return kdCell(total, zd, function(ad) { return ad.qiReel; }, null, style, zoneName, supId);
 }
 
-// Cellule % Rupt. réelle
-function kdDvPctCell(pct, zd, hasDV, style, zoneName) {
+function kdDvPctCell(pct, zd, hasDV, style, zoneName, supId) {
   if (!hasDV) return '<td style="' + (style || 'padding:7px 14px;text-align:right;color:var(--text3)') + '">—</td>';
   var s   = style || 'padding:7px 14px;text-align:right;white-space:nowrap';
   var fmt = function(v) { return v.toFixed(1) + '%'; };
@@ -179,55 +172,41 @@ function kdDvPctCell(pct, zd, hasDV, style, zoneName) {
     var ad = zd.abc[abc];
     if (!ad || ad.withQI === 0) return;
     var p2 = ad.qiReel > 0 ? ad.withQI / ad.qiReel * 100 : 0;
-    h += kdBadge(abc, fmt(p2), kdPctColor(200 - p2), zoneName);
+    h += kdBadge(abc, fmt(p2), kdPctColor(200 - p2), zoneName, supId);
   });
   return h + '</td>';
 }
 
-// ── Construction de la page ───────────────────────────────
-function kdBuildPage() {
-  var comp       = kdComputeData();
+// ── Rendu d'un tableau pour un fournisseur ────────────────
+function kdBuildTable(supName, supId, comp) {
   var data       = comp.data;
   var hasQIQD    = comp.hasQIQD;
   var ZONE_ORDER = comp.ZONE_ORDER;
 
-  var h = '';
-  var qiqdCount = typeof window !== 'undefined' && window.QIQD ? Object.keys(window.QIQD).length : 0;
-  var qiqdTs    = typeof S !== 'undefined' ? S.get('qiqd_ts') : null;
-  var syncLabel = qiqdTs ? ('Sync ' + new Date(qiqdTs).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})) : '';
+  // Vérifie qu'il y a au moins une zone non vide
+  var hasRows = ZONE_ORDER.some(function(z) { return data[z] && data[z].withQI > 0; });
+  if (!hasRows) return '';
 
-  // Header
-  h += '<div style="position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border);'
-     + 'padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap">';
-  h += '<span style="font-size:14px;font-weight:700">Dashboard Ruptures</span>';
-
-  if (qiqdCount > 0) {
-    h += '<span style="font-size:11px;background:var(--gbg);color:var(--g);border:1px solid var(--gbrd);'
-       + 'padding:2px 10px;border-radius:20px">✓ QI/QD — ' + qiqdCount + ' produits'
-       + (syncLabel ? ' · ' + syncLabel : '') + '</span>';
-  } else {
-    h += '<span style="font-size:11px;background:var(--obg);color:var(--o);border:1px solid var(--obrd);'
-       + 'padding:2px 10px;border-radius:20px">⚠ QI/QD non chargé — ruptures estimées depuis CSV</span>';
-  }
-
-  h += '<button id="kdSyncBtn" onclick="kdSyncQIQD()" style="font-size:11px;padding:4px 12px;border:1px solid var(--accent,#1976d2);'
-     + 'border-radius:6px;background:color-mix(in srgb,var(--accent,#1976d2) 10%,transparent);'
-     + 'color:var(--accent,#1976d2);cursor:pointer;white-space:nowrap">📊 Sync QI/QD</button>';
-  h += '<div id="kdSyncStatus" style="font-size:11px;font-family:\'Geist Mono\',monospace;color:var(--text3)"></div>';
-  h += '</div>';
-
-  // Tableau
-  h += '<div style="overflow:auto;flex:1;padding:0 0 40px 0">';
-  h += '<table style="border-collapse:collapse;width:100%;font-size:12px;min-width:560px">';
   var th  = 'padding:8px 14px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap';
   var thr = 'padding:8px 14px;text-align:right;border-bottom:1px solid var(--border2);white-space:nowrap';
   var thd = thr + (hasQIQD ? '' : ';color:var(--text3)');
+
+  var h = '';
+
+  // En-tête fournisseur
+  h += '<div style="padding:16px 16px 6px 16px;display:flex;align-items:center;gap:8px">';
+  h += '<span style="font-size:15px;font-weight:800;color:var(--text)">' + supName + '</span>';
+  h += '</div>';
+
+  // Tableau
+  h += '<div style="overflow-x:auto;padding:0 0 24px 0">';
+  h += '<table style="border-collapse:collapse;width:100%;font-size:12px;min-width:560px">';
   h += '<thead><tr style="background:var(--bg2)">';
   h += '<th style="' + th  + '">Zone</th>';
   h += '<th style="' + thr + '">Prod avec QI</th>';
   h += '<th style="' + thr + '">En stock</th>';
   h += '<th style="' + thr + '">% Rupture</th>';
-  h += '<th style="' + thd + '" title="Produits avec QI ≥ 1 et rupture < 30j (source QI/QD)">QI réel</th>';
+  h += '<th style="' + thd + '" title="Produits avec QI ≥ 1 et rupture < 30j">QI réel</th>';
   h += '<th style="' + thd + '" title="Prod avec QI / QI réel × 100">% Rupt. réelle</th>';
   h += '</tr></thead><tbody>';
 
@@ -241,15 +220,69 @@ function kdBuildPage() {
 
     h += '<tr style="background:var(--bg2);border-bottom:1px solid var(--border)">';
     h += '<td style="padding:8px 14px;font-weight:700;font-size:13px;color:' + zColor + '">' + zoneName + '</td>';
-    h += kdCell(zd.withQI, zd, function(ad) { return ad.withQI; }, null, null, zoneName);
-    h += kdCell(zd.inStock, zd, function(ad) { return ad.inStock; }, null, null, zoneName);
-    h += kdPctStockCell(pct, zd, null, zoneName);
-    h += kdDvCountCell(zd.qiReel, zd, hasQIQD, null, zoneName);
-    h += kdDvPctCell(pctR, zd, hasQIQD, null, zoneName);
+    h += kdCell(zd.withQI, zd, function(ad) { return ad.withQI; }, null, null, zoneName, supId);
+    h += kdCell(zd.inStock, zd, function(ad) { return ad.inStock; }, null, null, zoneName, supId);
+    h += kdPctStockCell(pct, zd, null, zoneName, supId);
+    h += kdDvCountCell(zd.qiReel, zd, hasQIQD, null, zoneName, supId);
+    h += kdDvPctCell(pctR, zd, hasQIQD, null, zoneName, supId);
     h += '</tr>';
   });
 
   h += '</tbody></table></div>';
+  return h;
+}
+
+// ── Construction de la page ───────────────────────────────
+function kdBuildPage() {
+  var qiqdCount = typeof window !== 'undefined' && window.QIQD ? Object.keys(window.QIQD).length : 0;
+  var qiqdTs    = typeof S !== 'undefined' ? S.get('qiqd_ts') : null;
+  var syncLabel = qiqdTs ? ('Sync ' + new Date(qiqdTs).toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})) : '';
+
+  var h = '';
+
+  // Header global
+  h += '<div style="position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border);'
+     + 'padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap">';
+  h += '<span style="font-size:14px;font-weight:700">Dashboard Ruptures</span>';
+
+  if (qiqdCount > 0) {
+    h += '<span style="font-size:11px;background:var(--gbg);color:var(--g);border:1px solid var(--gbrd);'
+       + 'padding:2px 10px;border-radius:20px">✓ QI/QD — ' + qiqdCount + ' produits'
+       + (syncLabel ? ' · ' + syncLabel : '') + '</span>';
+  } else {
+    h += '<span style="font-size:11px;background:var(--obg);color:var(--o);border:1px solid var(--obrd);'
+       + 'padding:2px 10px;border-radius:20px">⚠ QI/QD non chargé — ruptures estimées depuis CSV</span>';
+  }
+  h += '</div>';
+
+  // Corps : un tableau par fournisseur
+  h += '<div style="overflow:auto;flex:1;padding:0 0 40px 0">';
+
+  // Récupère les supIds présents dans P (dans l'ordre d'apparition)
+  var supIds = [];
+  var seen   = {};
+  P.forEach(function(p) {
+    var sid = p.supId || '__none__';
+    if (!seen[sid]) { seen[sid] = true; supIds.push(sid); }
+  });
+
+  supIds.forEach(function(supId) {
+    var prods   = P.filter(function(p) { return (p.supId || '__none__') === supId; });
+    var supName = supId === '__none__'
+      ? 'CSV / Data embarquée'
+      : ((typeof SUPPLIERS_DICT !== 'undefined' && SUPPLIERS_DICT[supId])
+          || (typeof NAV_SUPPLIERS !== 'undefined' && NAV_SUPPLIERS[supId])
+          || ('#' + supId));
+
+    var comp = kdComputeData(prods);
+    var sid  = supId === '__none__' ? null : supId;
+    h += kdBuildTable(supName, sid, comp);
+
+    // Séparateur entre tableaux
+    h += '<div style="height:1px;background:var(--border);margin:0 16px"></div>';
+  });
+
+  h += '</div>';
   return '<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">' + h + '</div>';
 }
 
@@ -287,12 +320,15 @@ function kdFamFilt(f) {
   if (tbody) tbody.innerHTML = _kdBuildRows(list);
 }
 
-function kdOpenAbc(zoneName, abc) {
+function kdOpenAbc(zoneName, abc, supId) {
   var modalId   = 'kd-abc-modal';
   var abcColors = { A: 'var(--g)', B: 'var(--o)', C: 'var(--r)', D: '#6b3fa0' };
 
   var prods = P.filter(function(p) {
-    return zone(p.a) === zoneName && (P_ABC[p.id] || 'D') === abc;
+    var zoneMatch = zone(p.a) === zoneName;
+    var abcMatch  = (P_ABC[p.id] || 'D') === abc;
+    var supMatch  = supId == null ? (!p.supId) : (p.supId === supId);
+    return zoneMatch && abcMatch && supMatch;
   }).sort(function(a, b) { return b.q - a.q; });
 
   var ex = document.getElementById(modalId); if (ex) ex.remove();
@@ -300,6 +336,12 @@ function kdOpenAbc(zoneName, abc) {
   window._kdAbcFamSel = '';
 
   var fams = [...new Set(prods.map(function(p) { return p.f; }))].sort();
+
+  // Nom fournisseur pour l'en-tête
+  var supName = supId == null ? 'CSV / Data embarquée'
+    : ((typeof SUPPLIERS_DICT !== 'undefined' && SUPPLIERS_DICT[supId])
+        || (typeof NAV_SUPPLIERS !== 'undefined' && NAV_SUPPLIERS[supId])
+        || ('#' + supId));
 
   var modal = document.createElement('div');
   modal.id = modalId;
@@ -311,6 +353,7 @@ function kdOpenAbc(zoneName, abc) {
   h += '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap">';
   h += '<span style="font-weight:800;font-size:14px;color:' + (abcColors[abc] || 'var(--text)') + ';background:var(--bg2);padding:3px 10px;border-radius:6px">' + abc + '</span>';
   h += '<span style="font-size:14px;font-weight:700">' + zoneName + '</span>';
+  h += '<span style="font-size:12px;color:var(--text2)">' + supName + '</span>';
   h += '<span style="font-size:12px;color:var(--text3)">' + prods.length + ' produits</span>';
 
   // Barcode zone
@@ -326,7 +369,6 @@ function kdOpenAbc(zoneName, abc) {
   });
   h += '</div>';
 
-  // Boutons
   h += '<button onclick="document.getElementById(\'' + modalId + '\').remove()" style="margin-left:auto;border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>';
   h += '</div>';
 
@@ -341,30 +383,4 @@ function kdOpenAbc(zoneName, abc) {
   modal.innerHTML = h;
   document.body.appendChild(modal);
   modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
-}
-
-// ── Sync QI/QD depuis le bouton Dashboard ────────────────
-function kdSyncQIQD() {
-  var btn = document.getElementById('kdSyncBtn');
-  var st  = document.getElementById('kdSyncStatus');
-  var ids = (typeof getActiveFournIds === 'function') ? getActiveFournIds() : [];
-
-  if (!ids.length) {
-    if (st) { st.textContent = '⚠ Aucun fournisseur actif — configurez dans l\'onglet Fournisseurs'; st.style.color='var(--o)'; }
-    return;
-  }
-  if (btn) btn.disabled = true;
-  if (st)  { st.textContent = 'Chargement…'; st.style.color = 'var(--text3)'; }
-
-  uFetchQIQD({
-    supplierIds: ids,
-    statusEl: st,
-    btnEl: btn,
-  }).then(function() {
-    if (typeof S !== 'undefined') S.set('qiqd_ts', Date.now());
-    if (btn) btn.disabled = false;
-    rKpiDashboard();
-  }).catch(function() {
-    if (btn) btn.disabled = false;
-  });
 }
