@@ -221,7 +221,21 @@ async function kfRefresh() {
   }
 }
 
-// Init appelé après que kdBuildPage() a injecté le placeholder #kf-section
+// ── Point d'entrée onglet KPI Sec ────────────────────────
+function rKpiSec() {
+  var el = document.getElementById('kpi-sec-page');
+  if (!el) return;
+  // Injecte le conteneur principal si pas encore fait
+  if (!el.querySelector('#kf-section')) {
+    el.innerHTML = '<div style="display:flex;flex-direction:column;flex:1;overflow:hidden">'
+      + '<div style="overflow:auto;flex:1;padding:0 0 40px 0">'
+      + '<div id="kf-section"></div>'
+      + '</div></div>';
+  }
+  kfRefresh();
+}
+
+// Init appelé depuis le dashboard (placeholder #kf-section dans kdBuildPage)
 async function kfInit() {
   if (!document.getElementById('kf-section')) return;
   await kfRefresh();
