@@ -88,6 +88,7 @@ function plBuildPage() {
     h += '<button onclick="plGoToday()" style="padding:4px 10px;border:1px solid var(--accent,#1976d2);border-radius:6px;background:transparent;cursor:pointer;font-size:12px;color:var(--accent,#1976d2)">Aujourd\'hui</button>';
   }
   h += '<div style="margin-left:auto;display:flex;gap:8px;align-items:center">';
+  h += '<button onclick="plOpenDuplicate()" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:12px">⧉ Dupliquer</button>';
   h += '<label style="font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer">⬆ Import CSV<input type="file" accept=".csv" onchange="plImportCSV(this)" style="display:none"></label>';
   h += '<button onclick="plExportCSV()" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:12px">⬇ Export CSV</button>';
   h += '<button onclick="plOpenConfig()" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:12px">⚙ Config</button>';
@@ -420,4 +421,104 @@ function plImportCSV(input) {
   };
   reader.readAsText(file);
   input.value = '';
+}
+
+// ── Dupliquer une semaine ─────────────────────────────────
+var _plDupTarget = null;
+
+function plOpenDuplicate() {
+  var ex = document.getElementById('pl-dup'); if (ex) ex.remove();
+  _plDupTarget = plWeekOffset(_plWeek, 1); // cible par défaut = semaine suivante
+
+  var modal = document.createElement('div');
+  modal.id = 'pl-dup';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = _plDupHTML();
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+}
+
+function _plDupHTML() {
+  var data     = plGet();
+  var srcLabel = plWeekLabel(_plWeek);
+  var dstLabel = plWeekLabel(_plDupTarget);
+  var srcHasData = data.weeks[_plWeek] && Object.keys(data.weeks[_plWeek]).length > 0;
+  var dstHasData = data.weeks[_plDupTarget] && Object.keys(data.weeks[_plDupTarget]).length > 0;
+
+  var h = '<div style="background:var(--bg,#fff);border-radius:12px;width:460px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2);overflow:hidden">';
+
+  // Header
+  h += '<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">';
+  h += '<span style="font-weight:700;font-size:14px">⧉ Dupliquer une semaine</span>';
+  h += '<button onclick="document.getElementById(\'pl-dup\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>';
+  h += '</div>';
+
+  h += '<div style="padding:20px 20px 8px 20px;display:flex;flex-direction:column;gap:18px">';
+
+  // Source
+  h += '<div>';
+  h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:6px">Source — copier depuis</div>';
+  h += '<div style="padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600">';
+  h += srcLabel;
+  if (!srcHasData) h += ' <span style="font-size:11px;color:var(--o,#f57c00);font-weight:400">(semaine vide)</span>';
+  h += '</div>';
+  h += '</div>';
+
+  // Destination
+  h += '<div>';
+  h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:6px">Destination — copier vers</div>';
+  h += '<div style="display:flex;align-items:center;gap:8px">';
+  h += '<button onclick="plDupNav(-1)" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:13px">←</button>';
+  h += '<div id="pl-dup-dst" style="flex:1;padding:10px 14px;background:var(--bg2);border:1px solid var(--accent,#1976d2);border-radius:8px;font-size:13px;font-weight:600;text-align:center">' + dstLabel + '</div>';
+  h += '<button onclick="plDupNav(1)"  style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);cursor:pointer;font-size:13px">→</button>';
+  h += '</div>';
+  if (dstHasData) {
+    h += '<div id="pl-dup-warn" style="margin-top:6px;font-size:11px;color:var(--o,#f57c00)">⚠ Cette semaine a déjà des données — elles seront remplacées.</div>';
+  } else {
+    h += '<div id="pl-dup-warn" style="margin-top:6px;font-size:11px;color:var(--text3)">Semaine vide — prête à recevoir la copie.</div>';
+  }
+  h += '</div>';
+
+  h += '</div>';
+
+  // Confirm
+  h += '<div style="padding:16px 20px;border-top:1px solid var(--border);margin-top:8px">';
+  h += '<button onclick="plConfirmDuplicate()" style="width:100%;padding:10px;background:var(--accent,#1976d2);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Dupliquer →</button>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function plDupNav(offset) {
+  _plDupTarget = plWeekOffset(_plDupTarget, offset);
+  var data     = plGet();
+  var dstLabel = plWeekLabel(_plDupTarget);
+  var dstHasData = data.weeks[_plDupTarget] && Object.keys(data.weeks[_plDupTarget]).length > 0;
+
+  var dstEl   = document.getElementById('pl-dup-dst');
+  var warnEl  = document.getElementById('pl-dup-warn');
+  if (dstEl)  dstEl.textContent = dstLabel;
+  if (warnEl) {
+    if (dstHasData) {
+      warnEl.textContent = '⚠ Cette semaine a déjà des données — elles seront remplacées.';
+      warnEl.style.color = 'var(--o,#f57c00)';
+    } else {
+      warnEl.textContent = 'Semaine vide — prête à recevoir la copie.';
+      warnEl.style.color = 'var(--text3)';
+    }
+  }
+}
+
+function plConfirmDuplicate() {
+  if (!_plDupTarget || _plDupTarget === _plWeek) return;
+  var data = plGet();
+  var src  = data.weeks[_plWeek] || {};
+  // Deep copy de la semaine source vers la cible
+  data.weeks[_plDupTarget] = JSON.parse(JSON.stringify(src));
+  plSave(data);
+  var m = document.getElementById('pl-dup'); if (m) m.remove();
+  // Naviguer vers la semaine dupliquée
+  _plWeek = _plDupTarget;
+  rPlanning();
+  if (typeof showToast === 'function') showToast('Planning dupliqué → ' + plWeekLabel(_plWeek));
 }
