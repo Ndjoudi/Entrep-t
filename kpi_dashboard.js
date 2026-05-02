@@ -38,7 +38,9 @@ function rKpiDashboard() {
   var el = document.getElementById('kpi-dashboard-page');
   if (!el) return;
   if (!P || !P.length) {
-    el.innerHTML = '<div style="padding:40px;text-align:center">'
+    var timeline = (typeof kdBuildTodayTimeline === 'function') ? kdBuildTodayTimeline() : '';
+    el.innerHTML = (timeline ? '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin:16px;overflow:hidden">' + timeline + '</div>' : '')
+      + '<div style="padding:40px;text-align:center">'
       + '<div style="color:var(--text3);margin-bottom:18px;font-size:14px">Aucun produit chargé.</div>'
       + '<button onclick="kdLoadAll()" style="background:var(--accent,#1976d2);color:#fff;border:none;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px">📊 Charger produits + QI/QD</button>'
       + '<div id="kdLoadStatus" style="margin-top:14px;font-size:13px;color:var(--accent)"></div>'
