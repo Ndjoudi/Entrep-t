@@ -173,6 +173,37 @@ function plBuildPage() {
 function plNav(offset) { _plWeek = plWeekOffset(_plWeek, offset); rPlanning(); }
 function plGoToday()   { _plWeek = plISOWeek(new Date()); rPlanning(); }
 
+// ── Helpers capture ───────────────────────────────────────
+// html2canvas ne comprend pas color-mix() ni var() dans les styles inline
+// → on les remplace temporairement par des valeurs rgb fixes
+function _plStripModernCSS(zone) {
+  var fixes = [];
+  zone.querySelectorAll('*').forEach(function(el) {
+    var s = el.getAttribute('style');
+    if (!s) return;
+    if (s.indexOf('color-mix') === -1 && s.indexOf('var(') === -1) return;
+    fixes.push({ el: el, orig: s });
+    var fixed = s
+      // color-mix(in srgb, accent 4-12%, bg) → léger bleu clair
+      .replace(/color-mix\(in srgb,var\(--accent[^)]*\)\s*\d+%,var\(--bg[^)]*\)\)/g, '#e8f0fe')
+      .replace(/color-mix\([^)]+\)/g, '#e8f0fe')
+      // var(--bg2) → blanc cassé, var(--bg) → blanc, var(--border) → gris clair
+      .replace(/var\(--bg2[^)]*\)/g,     '#f5f5f5')
+      .replace(/var\(--bg[^)]*\)/g,      '#ffffff')
+      .replace(/var\(--border2[^)]*\)/g, '#e0e0e0')
+      .replace(/var\(--border[^)]*\)/g,  '#e0e0e0')
+      .replace(/var\(--text3[^)]*\)/g,   '#9e9e9e')
+      .replace(/var\(--text2[^)]*\)/g,   '#555555')
+      .replace(/var\(--text[^)]*\)/g,    '#212121')
+      .replace(/var\(--accent[^)]*\)/g,  '#1976d2');
+    el.setAttribute('style', fixed);
+  });
+  return fixes;
+}
+function _plRestoreCSS(fixes) {
+  fixes.forEach(function(f) { f.el.setAttribute('style', f.orig); });
+}
+
 // ── Capture → modale image ────────────────────────────────
 function plCapture() {
   var zone = document.getElementById('pl-capture-zone');
@@ -185,7 +216,7 @@ function plCapture() {
 
   if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
 
-  // Masque les boutons/icônes d'action pendant la capture
+  // Masque les boutons d'action + icône ☰
   var actionBtns = zone.querySelectorAll('button');
   var grabIcons  = [];
   zone.querySelectorAll('[draggable]').forEach(function(el) {
@@ -198,13 +229,17 @@ function plCapture() {
   });
   actionBtns.forEach(function(b) { b.style.visibility = 'hidden'; });
 
+  // Remplace les couleurs modernes incompatibles avec html2canvas
+  var cssFixes = _plStripModernCSS(zone);
+
   html2canvas(zone, {
     backgroundColor: '#ffffff',
     scale: 2,
     useCORS: true,
     logging: false,
   }).then(function(canvas) {
-    // Restaure
+    // Restaure tout
+    _plRestoreCSS(cssFixes);
     actionBtns.forEach(function(b) { b.style.visibility = ''; });
     grabIcons.forEach(function(s) { if (s.dataset._orig) s.textContent = s.dataset._orig; });
     if (btn) { btn.textContent = '📸 Copier'; btn.disabled = false; }
@@ -223,6 +258,7 @@ function plCapture() {
     }, 'image/png');
 
   }).catch(function(err) {
+    _plRestoreCSS(cssFixes);
     actionBtns.forEach(function(b) { b.style.visibility = ''; });
     grabIcons.forEach(function(s) { if (s.dataset._orig) s.textContent = s.dataset._orig; });
     if (btn) { btn.textContent = '📸 Copier'; btn.disabled = false; }
