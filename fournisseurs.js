@@ -38,25 +38,7 @@ function rFournisseurs() {
   var list = getFournisseurs();
   var activeIds = list.filter(function(f){return f.active;}).map(function(f){return f.id;});
 
-  var tokens = getApiTokens();
   var html = '<div style="padding:20px;max-width:680px">';
-
-  // ── Section Tokens ───────────────────────────────────────────────────────────
-  html += '<div style="margin-bottom:20px;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px">';
-  html += '<div style="font-size:13px;font-weight:700;margin-bottom:12px">🔑 Tokens API</div>';
-  html += '<div style="margin-bottom:10px">';
-  html += '<div style="font-size:11px;color:var(--text3);font-family:\'Geist Mono\',monospace;margin-bottom:5px">X-Api-Bypass-Token <span style="color:var(--text3)">(pour api.labellevie.com)</span></div>';
-  html += '<div style="display:flex;gap:8px;align-items:center">';
-  html += '<input id="fBypassToken" type="password" value="'+fEsc(tokens.bypass||'')+'" placeholder="Coller le token ici…" style="flex:1;font-family:\'Geist Mono\',monospace;font-size:11px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;outline:none">';
-  html += '<button onclick="fToggleTokenVis(\'fBypassToken\',this)" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;font-size:12px">👁</button>';
-  html += '<button onclick="fSaveTokens()" class="btn pri" style="font-size:12px;padding:6px 14px">Enregistrer</button>';
-  html += '</div>';
-  html += '</div>';
-  html += '<div id="fTokenStatus" style="font-size:11px;color:var(--text3);margin-top:4px;font-family:\'Geist Mono\',monospace">';
-  if (tokens.bypass) html += '✅ Token enregistré';
-  else html += '⚠️ Token manquant — synchronisation QI/QD impossible';
-  html += '</div>';
-  html += '</div>';
 
   // ── Section Fournisseurs ─────────────────────────────────────────────────────
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
