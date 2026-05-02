@@ -70,7 +70,9 @@ function kdBuildDvIdx() {
 
 // ── Calcul données zone / ABC pour un tableau de produits donné ───────────
 function kdComputeData(prods) {
-  var hasQIQD = typeof window !== 'undefined' && window.QIQD && Object.keys(window.QIQD).length > 0;
+  // hasQIQD = true seulement si au moins un produit de CE groupe a des données QI/QD réelles
+  var hasQIQD = typeof window !== 'undefined' && window.QIQD
+    && prods.some(function(p) { return !!window.QIQD[p.id]; });
   var dvIdx   = hasQIQD ? {} : kdBuildDvIdx();
 
   var ZONE_ORDER = ['LGV','PF','Rota','Prio','Salée','Sucrée','Liquide','DPH','Frais sec','Autre'];
