@@ -132,15 +132,21 @@ function plBuildPage() {
 
       // Cards
       cell.forEach(function(entry, ei) {
-        var slot = data.slots.find(function(s) { return s.label === entry.slot; });
-        var sc   = slot ? slot.color : '#888';
+        var slot  = data.slots.find(function(s) { return s.label === entry.slot; });
+        var sc    = slot ? slot.color : '#888';
         var gSafe = group.replace(/'/g,"\\'");
-        h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:4px;font-size:11px;display:flex;align-items:flex-start;justify-content:space-between;gap:4px">';
-        h += '<div>';
-        h += '<div style="font-weight:600;margin-bottom:3px;font-size:12px">' + entry.emp + '</div>';
-        h += '<span style="background:' + sc + ';color:#fff;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:600;white-space:nowrap">' + entry.slot + '</span>';
-        h += '</div>';
-        h += '<button onclick="plDeleteEntry(\'' + _plWeek + '\',' + i + ',\'' + gSafe + '\',' + ei + ')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0;line-height:1;flex-shrink:0">×</button>';
+        var wk    = _plWeek;
+        h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:4px;font-size:11px">';
+        // Ligne nom + actions
+        h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:4px">';
+        h += '<span style="font-weight:600;font-size:12px">' + entry.emp + '</span>';
+        h += '<div style="display:flex;gap:3px;flex-shrink:0">';
+        h += '<button title="Dupliquer" onclick="plDuplicateCard(\'' + wk + '\',' + i + ',\'' + gSafe + '\',' + ei + ')" style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text3);font-size:11px;padding:1px 5px;line-height:1.4">⧉</button>';
+        h += '<button title="Modifier le créneau" onclick="plEditSlot(\'' + wk + '\',' + i + ',\'' + gSafe + '\',' + ei + ')" style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text3);font-size:11px;padding:1px 5px;line-height:1.4">✏️</button>';
+        h += '<button title="Supprimer" onclick="plDeleteEntry(\'' + wk + '\',' + i + ',\'' + gSafe + '\',' + ei + ')" style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text3);font-size:12px;padding:1px 5px;line-height:1.4">×</button>';
+        h += '</div></div>';
+        // Badge créneau
+        h += '<span style="background:' + sc + ';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap">' + entry.slot + '</span>';
         h += '</div>';
       });
 
@@ -266,6 +272,93 @@ function plDeleteEntry(weekStr, dayIdx, group, ei) {
     plSave(data);
     rPlanning();
   }
+}
+
+// Duplique la carte (même employé, même créneau) dans la même cellule
+function plDuplicateCard(weekStr, dayIdx, group, ei) {
+  var data  = plGet();
+  var key   = plCellKey(dayIdx, group);
+  if (!data.weeks[weekStr] || !data.weeks[weekStr][key]) return;
+  var entry = data.weeks[weekStr][key][ei];
+  if (!entry) return;
+  data.weeks[weekStr][key].splice(ei + 1, 0, { emp: entry.emp, slot: entry.slot });
+  plSave(data);
+  rPlanning();
+}
+
+// Ouvre une modale pour modifier uniquement le créneau d'une carte existante
+function plEditSlot(weekStr, dayIdx, group, ei) {
+  var data  = plGet();
+  var key   = plCellKey(dayIdx, group);
+  if (!data.weeks[weekStr] || !data.weeks[weekStr][key]) return;
+  var entry = data.weeks[weekStr][key][ei];
+  if (!entry) return;
+
+  var ex = document.getElementById('pl-edit-modal'); if (ex) ex.remove();
+  var DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+  var modal = document.createElement('div');
+  modal.id = 'pl-edit-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  var h = '<div style="background:var(--bg,#fff);border-radius:12px;width:380px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2);overflow:hidden">';
+  h += '<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">';
+  h += '<div>';
+  h += '<div style="font-weight:700;font-size:14px">✏️ Modifier le créneau</div>';
+  h += '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + entry.emp + ' — ' + DAYS[dayIdx] + ' · ' + group + '</div>';
+  h += '</div>';
+  h += '<button onclick="document.getElementById(\'pl-edit-modal\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>';
+  h += '</div>';
+
+  h += '<div style="padding:16px">';
+  h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:10px">Choisir un créneau</div>';
+  h += '<div id="pl-edit-slot-list" style="display:flex;flex-wrap:wrap;gap:7px">';
+  data.slots.forEach(function(slot) {
+    var isCurrent = slot.label === entry.slot;
+    h += '<button class="pl-edit-slot-btn" data-slot="' + slot.label + '" onclick="plEditSelectSlot(this)" ';
+    h += 'style="padding:7px 14px;border:2px solid ' + slot.color + ';border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;';
+    h += isCurrent ? 'background:' + slot.color + ';color:#fff"' : 'background:transparent;color:' + slot.color + '"';
+    h += '>' + slot.label + '</button>';
+  });
+  h += '</div></div>';
+
+  h += '<div style="padding:12px 16px;border-top:1px solid var(--border)">';
+  h += '<button onclick="plConfirmEditSlot(\'' + weekStr + '\',' + dayIdx + ',\'' + group.replace(/'/g,"\\'") + '\',' + ei + ')" style="width:100%;padding:10px;background:var(--accent,#1976d2);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Enregistrer</button>';
+  h += '</div></div>';
+
+  modal.innerHTML = h;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+  window._plEditSelSlot = entry.slot; // pré-sélectionné = créneau actuel
+}
+
+function plEditSelectSlot(btn) {
+  var data = plGet();
+  document.querySelectorAll('.pl-edit-slot-btn').forEach(function(b) {
+    var s = data.slots.find(function(x) { return x.label === b.dataset.slot; });
+    var c = s ? s.color : '#888';
+    b.style.background = 'transparent';
+    b.style.borderColor = c;
+    b.style.color = c;
+  });
+  var slot  = data.slots.find(function(s) { return s.label === btn.dataset.slot; });
+  var color = slot ? slot.color : '#888';
+  btn.style.background  = color;
+  btn.style.borderColor = color;
+  btn.style.color       = '#fff';
+  window._plEditSelSlot = btn.dataset.slot;
+}
+
+function plConfirmEditSlot(weekStr, dayIdx, group, ei) {
+  if (!window._plEditSelSlot) return;
+  var data = plGet();
+  var key  = plCellKey(dayIdx, group);
+  if (data.weeks[weekStr] && data.weeks[weekStr][key] && data.weeks[weekStr][key][ei]) {
+    data.weeks[weekStr][key][ei].slot = window._plEditSelSlot;
+    plSave(data);
+  }
+  var m = document.getElementById('pl-edit-modal'); if (m) m.remove();
+  rPlanning();
 }
 
 // ── Config modal ──────────────────────────────────────────
