@@ -245,8 +245,8 @@ function uMapProd(ap, supId) {
 
 // ── Panel Sources 🔄 ──────────────────────────────────────────────────────────
 var NAV_LOADED  = { data: false, prod: {}, qiqd: {} };
-var NAV_FILTER  = {};   // supId → true/false
-var NAV_P_BAK   = {};   // supId → produits sauvegardés quand filtre OFF
+var NAV_FILTER  = {};   // supId → true/false (undefined = ON)
+var P_ALL       = [];   // tableau maître — contient TOUS les produits chargés
 
 function toggleNavSrcPanel() {
   var panel = document.getElementById('navSrcPanel');
@@ -357,6 +357,7 @@ async function navSrcLoadData() {
     parsed.forEach(function(p){P.push(p);});
     if (typeof applyFamOv === 'function') applyFamOv();
     NAV_LOADED.data = true;
+    navSyncPAll();
     setMsg('✅ Data : ' + P.length + ' produits', 'var(--g,#388e3c)');
     initNavSrcPanel();
     navSrcRefresh();
@@ -371,7 +372,9 @@ async function navSrcOneProd(supId) {
   if (st) { st.style.display='block'; st.textContent='⏳ Prod ' + supId + '…'; st.style.color='var(--accent)'; }
   await uFetchProducts({ supplierIds:[supId], statusEl:st, progressEl:null, fillEl:null, textEl:null, btnEl:null });
   NAV_LOADED.prod[supId] = true;
-  initNavSrcPanel();   // rafraîchit le panel (bouton → vert)
+  if (NAV_FILTER[supId] === undefined) NAV_FILTER[supId] = true;
+  navSyncPAll();       // met à jour P_ALL après le chargement
+  initNavSrcPanel();
   navSrcRefresh();
 }
 
@@ -386,35 +389,38 @@ async function navSrcOneQIQD(supId) {
 }
 
 
-// ── Toggle filtre fournisseur — modifie P directement (s'applique à tous les onglets)
+// ── Synchronise P_ALL avec P courant (appelé après chaque chargement) ─────────
+function navSyncPAll() {
+  // Ajoute dans P_ALL les produits nouveaux (pas déjà présents)
+  var ids = {};
+  P_ALL.forEach(function(p){ ids[p.id] = true; });
+  P.forEach(function(p){ if (!ids[p.id]) P_ALL.push(p); });
+}
+
+// ── Applique NAV_FILTER sur P depuis P_ALL ────────────────────────────────────
+function navApplyFilter() {
+  P.length = 0;
+  P_ALL.forEach(function(p) {
+    // Inclure si : pas de supId, ou supId non filtré, ou filtre explicitement ON
+    if (!p.supId || NAV_FILTER[p.supId] !== false) P.push(p);
+  });
+}
+
+// ── Toggle filtre fournisseur ─────────────────────────────────────────────────
 function navFilterToggle(supId) {
-  NAV_FILTER[supId] = !NAV_FILTER[supId];
-  var on = NAV_FILTER[supId];
+  NAV_FILTER[supId] = (NAV_FILTER[supId] === false) ? true : false;
+  var on = NAV_FILTER[supId] !== false;
 
-  if (!on) {
-    // Retire les produits de ce fournisseur de P et les sauvegarde
-    NAV_P_BAK[supId] = [];
-    for (var i = P.length - 1; i >= 0; i--) {
-      if (P[i].supId === supId) {
-        NAV_P_BAK[supId].push(P[i]);
-        P.splice(i, 1);
-      }
-    }
-  } else {
-    // Restaure les produits sauvegardés
-    if (NAV_P_BAK[supId] && NAV_P_BAK[supId].length) {
-      NAV_P_BAK[supId].forEach(function(p) { P.push(p); });
-      delete NAV_P_BAK[supId];
-    }
-  }
+  // Reconstruit P depuis P_ALL selon les filtres actifs
+  navApplyFilter();
 
-  // Met à jour le visuel du toggle
+  // Visuel toggle
   var trk = document.getElementById('nfil_' + supId);
   var knb = document.getElementById('nfil_k_' + supId);
   if (trk) trk.style.background = on ? 'var(--accent,#1976d2)' : '#bbb';
   if (knb) knb.style.transform  = on ? 'translateX(16px)' : 'translateX(2px)';
 
-  // Recalcule et re-rend l'onglet actif immédiatement
+  // Re-rend tout
   if (typeof computeAlerts === 'function') computeAlerts();
   if (typeof updateBadge   === 'function') updateBadge();
   var di = document.getElementById('dinfo');
