@@ -125,21 +125,23 @@ function plBuildPage() {
     h += '</td>';
 
     DAYS.forEach(function(day, i) {
-      var cell = plGetCell(plGet(), _plWeek, i, group);
+      var cell    = plGetCell(plGet(), _plWeek, i, group);
       var isToday = _plWeek === todayWeek && i === todayDow;
-      var cellBg = isToday ? 'background:color-mix(in srgb,var(--accent,#1976d2) 4%,var(--bg))' : 'background:var(--bg)';
-      h += '<td style="padding:6px;border:1px solid var(--border);vertical-align:top;' + cellBg + '">';
+      var cellBg  = isToday ? 'background:color-mix(in srgb,var(--accent,#1976d2) 4%,var(--bg))' : 'background:var(--bg)';
+      var gSafe   = group.replace(/'/g,"\\'");
+      var wk      = _plWeek;
+      h += '<td id="plcell_' + i + '_' + gSafe + '" style="padding:6px;border:1px solid var(--border);vertical-align:top;transition:background .15s;' + cellBg + '"';
+      h += ' ondragover="plDragOver(event)" ondragleave="plDragLeave(event)" ondrop="plDrop(event,\'' + wk + '\',' + i + ',\'' + gSafe + '\')">';
 
       // Cards
       cell.forEach(function(entry, ei) {
         var slot  = data.slots.find(function(s) { return s.label === entry.slot; });
         var sc    = slot ? slot.color : '#888';
-        var gSafe = group.replace(/'/g,"\\'");
-        var wk    = _plWeek;
-        h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:4px;font-size:11px">';
+        h += '<div draggable="true" ondragstart="plDragStart(event,\'' + wk + '\',' + i + ',\'' + gSafe + '\',' + ei + ')" ondragend="plDragEnd(event)" ';
+        h += 'style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:4px;font-size:11px;cursor:grab">';
         // Ligne nom + actions
         h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:4px">';
-        h += '<span style="font-weight:600;font-size:12px">' + entry.emp + '</span>';
+        h += '<span style="font-weight:600;font-size:12px">☰ ' + entry.emp + '</span>';
         h += '<div style="display:flex;gap:3px;flex-shrink:0">';
         h += '<button title="Dupliquer" onclick="plDuplicateCard(\'' + wk + '\',' + i + ',\'' + gSafe + '\',' + ei + ')" style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text3);font-size:11px;padding:1px 5px;line-height:1.4">⧉</button>';
         h += '<button title="Modifier le créneau" onclick="plEditSlot(\'' + wk + '\',' + i + ',\'' + gSafe + '\',' + ei + ')" style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text3);font-size:11px;padding:1px 5px;line-height:1.4">✏️</button>';
@@ -151,8 +153,7 @@ function plBuildPage() {
       });
 
       // Add button
-      var gSafe2 = group.replace(/'/g,"\\'");
-      h += '<button onclick="plOpenAdd(\'' + _plWeek + '\',' + i + ',\'' + gSafe2 + '\')" style="width:100%;padding:5px;border:1px dashed var(--border2,#ccc);border-radius:6px;background:none;cursor:pointer;color:var(--text3);font-size:11px">+ Ajouter</button>';
+      h += '<button onclick="plOpenAdd(\'' + wk + '\',' + i + ',\'' + gSafe + '\')" style="width:100%;padding:5px;border:1px dashed var(--border2,#ccc);border-radius:6px;background:none;cursor:pointer;color:var(--text3);font-size:11px">+ Ajouter</button>';
       h += '</td>';
     });
     h += '</tr>';
@@ -272,6 +273,72 @@ function plDeleteEntry(weekStr, dayIdx, group, ei) {
     plSave(data);
     rPlanning();
   }
+}
+
+// ── Drag & Drop ───────────────────────────────────────────
+var _plDrag = null;
+
+function plDragStart(e, weekStr, dayIdx, group, ei) {
+  _plDrag = { weekStr: weekStr, dayIdx: dayIdx, group: group, ei: ei };
+  e.dataTransfer.effectAllowed = 'move';
+  // Légère transparence sur la carte en cours de déplacement
+  var card = e.currentTarget;
+  setTimeout(function() { if (card) card.style.opacity = '0.4'; }, 0);
+}
+
+function plDragEnd(e) {
+  if (e.currentTarget) e.currentTarget.style.opacity = '';
+  // Retire tous les highlights de cellule
+  document.querySelectorAll('td[id^="plcell_"]').forEach(function(td) {
+    td.style.outline = '';
+    td.style.background = '';
+  });
+  _plDrag = null;
+}
+
+function plDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.outline = '2px solid var(--accent,#1976d2)';
+  e.currentTarget.style.background = 'color-mix(in srgb,var(--accent,#1976d2) 10%,var(--bg))';
+}
+
+function plDragLeave(e) {
+  e.currentTarget.style.outline = '';
+  e.currentTarget.style.background = '';
+}
+
+function plDrop(e, weekStr, dayIdx, group) {
+  e.preventDefault();
+  e.currentTarget.style.outline   = '';
+  e.currentTarget.style.background = '';
+  if (!_plDrag) return;
+
+  var src = _plDrag;
+  // Même cellule → rien
+  if (src.weekStr === weekStr && src.dayIdx === dayIdx && src.group === group) {
+    _plDrag = null; return;
+  }
+
+  var data   = plGet();
+  var srcKey = plCellKey(src.dayIdx, src.group);
+  var dstKey = plCellKey(dayIdx, group);
+
+  if (!data.weeks[src.weekStr]) { _plDrag = null; return; }
+  var srcArr = data.weeks[src.weekStr][srcKey];
+  if (!srcArr || !srcArr[src.ei]) { _plDrag = null; return; }
+
+  // Extrait la carte de la source
+  var entry = srcArr.splice(src.ei, 1)[0];
+
+  // Insère dans la destination
+  if (!data.weeks[weekStr]) data.weeks[weekStr] = {};
+  if (!data.weeks[weekStr][dstKey]) data.weeks[weekStr][dstKey] = [];
+  data.weeks[weekStr][dstKey].push(entry);
+
+  plSave(data);
+  _plDrag = null;
+  rPlanning();
 }
 
 // Duplique la carte (même employé, même créneau) dans la même cellule
