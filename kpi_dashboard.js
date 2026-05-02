@@ -91,6 +91,8 @@ function kdComputeData() {
   });
 
   P.forEach(function(p) {
+    // Filtre fournisseur : si supId connu et toggle OFF → on ignore
+    if (p.supId && typeof NAV_FILTER !== 'undefined' && NAV_FILTER[p.supId] === false) return;
     var z   = zone(p.a);
     var abc = P_ABC[p.id] || 'D';
     var fam = p.f || 'Z';

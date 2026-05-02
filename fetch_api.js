@@ -152,7 +152,7 @@ async function uFetchProducts(opts) {
       const actualPerPage = d1.perPage || d1.products.length || U_PER_PAGE;
       const totalPages    = totalFound > 0 ? Math.ceil(totalFound / actualPerPage) : 999;
 
-      allProducts = allProducts.concat(d1.products);
+      allProducts = allProducts.concat(d1.products.map(function(p){ p._supId=supId; return p; }));
       setProgress(allProducts.length, totalFound * supplierIds.length);
       setStatus('Fourn. ' + (si+1) + '/' + supplierIds.length + ' — page 1/' + totalPages + ' (' + allProducts.length + ' produits)');
 
@@ -163,7 +163,7 @@ async function uFetchProducts(opts) {
         const r = await fetch(U_PROXY + '?action=products&page=' + page + '&perPage=' + U_PER_PAGE + '&supplier=' + supId + bParam);
         const d = await r.json();
         if (d.error || !d.products || !d.products.length) break;
-        allProducts = allProducts.concat(d.products);
+        allProducts = allProducts.concat(d.products.map(function(p){ p._supId=supId; return p; }));
         setProgress(allProducts.length, totalFound * supplierIds.length);
         await new Promise(function(res) { setTimeout(res, 80); });
       }
@@ -186,7 +186,7 @@ async function uFetchProducts(opts) {
           idx[id].st = ap.stock != null ? +ap.stock : idx[id].st;
           updated++;
         } else {
-          P.push(uMapProd(ap));
+          P.push(uMapProd(ap, ap._supId));
           added++;
         }
       });
@@ -200,7 +200,7 @@ async function uFetchProducts(opts) {
 
     } else {
       P.length = 0;
-      allProducts.forEach(function(ap) { P.push(uMapProd(ap)); });
+      allProducts.forEach(function(ap) { P.push(uMapProd(ap, ap._supId)); });
       computeAlerts(); updateBadge();
       T('kpi-dashboard');
       const msg = '✅ ' + P.length + ' produits chargés depuis l\'API';
@@ -220,7 +220,7 @@ async function uFetchProducts(opts) {
 }
 
 // ── Mapping API → format P de core.js ────────────────────────────────────────
-function uMapProd(ap) {
+function uMapProd(ap, supId) {
   const a = ap.zone || 0;
   return {
     id:  +ap.id,
@@ -239,11 +239,13 @@ function uMapProd(ap) {
     typo:    ap.typology   || '',
     supRef:  ap.supplier_ref || '',
     groupId: ap.group_id   || null,
+    supId:   supId || null,
   };
 }
 
 // ── Panel Sources 🔄 ──────────────────────────────────────────────────────────
 var NAV_LOADED = { data: false, prod: {}, qiqd: {} };
+var NAV_FILTER = {};   // supId → true/false (filtre dashboard, défaut = true)
 
 function toggleNavSrcPanel() {
   var panel = document.getElementById('navSrcPanel');
@@ -310,6 +312,19 @@ function initNavSrcPanel() {
             + '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace">ID ' + f.id + '</div></div>';
       html += '<button onclick="navSrcOneProd(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + prodSt + '">' + (prodOk ? '✓ Prod' : 'Prod') + '</button>';
       html += '<button onclick="navSrcOneQIQD(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + qiqdSt + '">' + (qiqdOk ? '✓ QI/QD' : 'QI/QD') + '</button>';
+      // Toggle filtre — apparaît seulement si chargé
+      if (prodOk || qiqdOk) {
+        if (NAV_FILTER[f.id] === undefined) NAV_FILTER[f.id] = true;
+        var fOn = NAV_FILTER[f.id];
+        var fBg = fOn ? 'var(--accent,#1976d2)' : '#bbb';
+        var fTx = fOn ? '16px' : '2px';
+        html += '<span id="nfil_' + f.id + '" onclick="navFilterToggle(\'' + f.id + '\')" '
+              + 'style="display:inline-flex;width:38px;height:22px;border-radius:11px;background:' + fBg + ';'
+              + 'align-items:center;cursor:pointer;transition:background .2s;padding:3px;box-sizing:border-box;flex-shrink:0" title="Afficher dans le dashboard">'
+              + '<span id="nfil_k_' + f.id + '" style="width:16px;height:16px;border-radius:50%;background:#fff;'
+              + 'transform:translateX(' + fTx + ');transition:transform .2s;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span>'
+              + '</span>';
+      }
       html += '</div>';
     });
   } else {
@@ -369,6 +384,17 @@ async function navSrcOneQIQD(supId) {
   navSrcRefresh();
 }
 
+
+// ── Toggle filtre fournisseur dans le dashboard ───────────────────────────────
+function navFilterToggle(supId) {
+  NAV_FILTER[supId] = !NAV_FILTER[supId];
+  var on  = NAV_FILTER[supId];
+  var trk = document.getElementById('nfil_' + supId);
+  var knb = document.getElementById('nfil_k_' + supId);
+  if (trk) trk.style.background = on ? 'var(--accent,#1976d2)' : '#bbb';
+  if (knb) knb.style.transform  = on ? 'translateX(16px)' : 'translateX(2px)';
+  navSrcRefresh();   // re-rend l'onglet actif avec le nouveau filtre
+}
 
 // ── Rafraîchit l'onglet actif ─────────────────────────────────────────────────
 function navSrcRefresh() {
