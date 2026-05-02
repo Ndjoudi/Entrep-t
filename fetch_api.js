@@ -244,8 +244,9 @@ function uMapProd(ap, supId) {
 }
 
 // ── Panel Sources 🔄 ──────────────────────────────────────────────────────────
-var NAV_LOADED = { data: false, prod: {}, qiqd: {} };
-var NAV_FILTER = {};   // supId → true/false (filtre dashboard, défaut = true)
+var NAV_LOADED  = { data: false, prod: {}, qiqd: {} };
+var NAV_FILTER  = {};   // supId → true/false
+var NAV_P_BAK   = {};   // supId → produits sauvegardés quand filtre OFF
 
 function toggleNavSrcPanel() {
   var panel = document.getElementById('navSrcPanel');
@@ -385,15 +386,38 @@ async function navSrcOneQIQD(supId) {
 }
 
 
-// ── Toggle filtre fournisseur dans le dashboard ───────────────────────────────
+// ── Toggle filtre fournisseur — modifie P directement (s'applique à tous les onglets)
 function navFilterToggle(supId) {
   NAV_FILTER[supId] = !NAV_FILTER[supId];
-  var on  = NAV_FILTER[supId];
+  var on = NAV_FILTER[supId];
+
+  if (!on) {
+    // Retire les produits de ce fournisseur de P et les sauvegarde
+    NAV_P_BAK[supId] = [];
+    for (var i = P.length - 1; i >= 0; i--) {
+      if (P[i].supId === supId) {
+        NAV_P_BAK[supId].push(P[i]);
+        P.splice(i, 1);
+      }
+    }
+  } else {
+    // Restaure les produits sauvegardés
+    if (NAV_P_BAK[supId] && NAV_P_BAK[supId].length) {
+      NAV_P_BAK[supId].forEach(function(p) { P.push(p); });
+      delete NAV_P_BAK[supId];
+    }
+  }
+
+  // Met à jour le visuel du toggle
   var trk = document.getElementById('nfil_' + supId);
   var knb = document.getElementById('nfil_k_' + supId);
   if (trk) trk.style.background = on ? 'var(--accent,#1976d2)' : '#bbb';
   if (knb) knb.style.transform  = on ? 'translateX(16px)' : 'translateX(2px)';
-  navSrcRefresh();   // re-rend l'onglet actif avec le nouveau filtre
+
+  // Recalcule et re-rend l'onglet actif
+  if (typeof computeAlerts === 'function') computeAlerts();
+  if (typeof updateBadge   === 'function') updateBadge();
+  navSrcRefresh();
 }
 
 // ── Rafraîchit l'onglet actif ─────────────────────────────────────────────────
