@@ -414,10 +414,15 @@ function navFilterToggle(supId) {
   if (trk) trk.style.background = on ? 'var(--accent,#1976d2)' : '#bbb';
   if (knb) knb.style.transform  = on ? 'translateX(16px)' : 'translateX(2px)';
 
-  // Recalcule et re-rend l'onglet actif
+  // Recalcule et re-rend l'onglet actif immédiatement
   if (typeof computeAlerts === 'function') computeAlerts();
   if (typeof updateBadge   === 'function') updateBadge();
-  navSrcRefresh();
+  var di = document.getElementById('dinfo');
+  if (di) di.textContent = P.length + ' produits';
+  if (typeof T === 'function') {
+    var ap = document.querySelector('.page.active');
+    T(ap ? ap.id.replace('-page', '') : 'kpi-dashboard');
+  }
 }
 
 // ── Rafraîchit l'onglet actif ─────────────────────────────────────────────────
