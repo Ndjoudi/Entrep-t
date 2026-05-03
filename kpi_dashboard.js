@@ -208,8 +208,8 @@ function kdBuildTable(supName, supId, comp) {
   h += '<table style="border-collapse:collapse;width:100%;font-size:12px;min-width:560px">';
   h += '<thead><tr style="background:var(--bg2)">';
   h += '<th style="' + th  + '">Zone</th>';
-  h += '<th style="' + thr + '">Prod avec QI</th>';
   h += '<th style="' + thr + '">En stock</th>';
+  h += '<th style="' + thr + '">Prod avec QI</th>';
   h += '<th style="' + thr + '">% Rupture</th>';
   h += '<th style="' + thd + '" title="Produits avec QI ≥ 1 et rupture < 30j">QI réel</th>';
   h += '<th style="' + thd + '" title="En stock / QI réel × 100">% Rupt. réelle</th>';
@@ -225,8 +225,8 @@ function kdBuildTable(supName, supId, comp) {
 
     h += '<tr style="background:var(--bg2);border-bottom:1px solid var(--border)">';
     h += '<td style="padding:8px 14px;font-weight:700;font-size:13px;color:' + zColor + '">' + zoneName + '</td>';
-    h += kdCell(zd.withQI, zd, function(ad) { return ad.withQI; }, null, null, zoneName, supId);
     h += kdCell(zd.inStock, zd, function(ad) { return ad.inStock; }, null, null, zoneName, supId);
+    h += kdCell(zd.withQI, zd, function(ad) { return ad.withQI; }, null, null, zoneName, supId);
     h += kdPctStockCell(pct, zd, null, zoneName, supId);
     h += kdDvCountCell(zd.qiReel, zd, hasQIQD, null, zoneName, supId);
     h += kdDvPctCell(pctR, zd, hasQIQD, null, zoneName, supId);
