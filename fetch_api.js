@@ -52,9 +52,10 @@ async function uFetchQIQD(opts) { // retourne une Promise
       P.forEach(function(p) {
         var q = window.QIQD[p.id];
         if (!q) return;
-        p.st  = q.stock != null ? q.stock : p.st;
-        p.q   = q.qi   != null ? q.qi    : p.q;
-        p.rupt = q.rupt;
+        p.st    = q.stock  != null ? q.stock  : p.st;
+        p.q     = q.qi     != null ? q.qi     : p.q;
+        p.rupt  = q.rupt;
+        p.rupt90 = q.rupt90;
       });
       if (typeof computeAlerts === 'function') computeAlerts();
       if (typeof updateBadge   === 'function') updateBadge();
