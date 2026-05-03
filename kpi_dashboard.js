@@ -225,7 +225,8 @@ function kdBuildTable(supName, supId, comp) {
     var pct  = zd.withQI > 0 ? zd.inStock / zd.withQI * 100 : 0;
     var pctR = zd.qiReel > 0 ? zd.inStock / zd.qiReel * 100 : 0;
 
-    h += '<tr style="background:var(--bg2);border-bottom:1px solid var(--border)">';
+    var zSupArg = supId != null ? '\'' + supId + '\'' : 'null';
+    h += '<tr style="background:var(--bg2);border-bottom:1px solid var(--border);cursor:pointer" onclick="kdOpenZone(\'' + zoneName.replace(/'/g,"\\'") + '\',' + zSupArg + ')">';
     h += '<td style="padding:8px 14px;font-weight:700;font-size:13px;color:' + zColor + '">' + zoneName + '</td>';
     h += kdCell(zd.inStock, zd, function(ad) { return ad.inStock; }, null, null, zoneName, supId);
     h += kdCell(zd.withQI, zd, function(ad) { return ad.withQI; }, null, null, zoneName, supId);
@@ -341,6 +342,69 @@ function kdFamFilt(f) {
     : (window._kdAbcProds || []);
   var tbody = document.querySelector('#' + modalId + '-tbody');
   if (tbody) tbody.innerHTML = _kdBuildRows(list);
+}
+
+function kdOpenZone(zoneName, supId) {
+  var modalId = 'kd-abc-modal';
+
+  // Source : P si chargé, sinon pseudo-produits QIQD
+  var sourceProds = (P && P.length) ? P : kdQIQDToPseudoProds();
+  var prods = sourceProds.filter(function(p) {
+    var zoneMatch = zone(p.a) === zoneName;
+    var supMatch  = supId == null ? (!p.supId || p.supId === '__none__') : (String(p.supId) === String(supId));
+    return zoneMatch && supMatch;
+  }).sort(function(a, b) { return (b.q || 0) - (a.q || 0); });
+
+  var ex = document.getElementById(modalId); if (ex) ex.remove();
+  window._kdAbcProds  = prods;
+  window._kdAbcFamSel = '';
+
+  var fams = [...new Set(prods.map(function(p) { return p.f; }).filter(Boolean))].sort();
+
+  var supName = supId == null ? 'CSV / Data embarquée'
+    : ((typeof SUPPLIERS_DICT !== 'undefined' && SUPPLIERS_DICT[supId])
+        || (typeof NAV_SUPPLIERS !== 'undefined' && NAV_SUPPLIERS[supId])
+        || ('#' + supId));
+
+  var zColor = ZC[zoneName] || '#757575';
+
+  var modal = document.createElement('div');
+  modal.id = modalId;
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto';
+
+  var h = '<div style="background:var(--bg,#fff);border-radius:12px;width:900px;max-width:98vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)">';
+
+  h += '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap">';
+  h += '<span style="font-weight:800;font-size:14px;color:' + zColor + '">' + zoneName + '</span>';
+  h += '<span style="font-size:12px;color:var(--text2)">' + supName + '</span>';
+  h += '<span style="font-size:12px;color:var(--text3)">' + prods.length + ' produits</span>';
+
+  h += '<div id="modal-barcode-zone" style="display:flex;flex-direction:column;align-items:center;min-width:160px;padding:4px 8px;background:var(--bg2);border-radius:var(--r6,6px);border:1px solid var(--border)">';
+  h += '<span style="font-size:9px;color:var(--text3);margin-bottom:2px">Code-barre</span>';
+  h += '<div id="modal-barcode-img" style="min-height:40px;display:flex;align-items:center;justify-content:center"><span style="font-size:10px;color:var(--text3)">— cliquer sur ✓ —</span></div></div>';
+
+  if (fams.length) {
+    h += '<div id="' + modalId + '-fam" style="display:flex;gap:3px;flex-wrap:wrap;align-items:center">';
+    h += '<span style="font-size:10px;color:var(--text3)">Famille:</span>';
+    fams.forEach(function(f) {
+      h += '<span class="fam f' + f + '" style="cursor:pointer;font-size:10px;padding:1px 5px" onclick="kdFamFilt(\'' + f + '\')">' + f + '</span>';
+    });
+    h += '</div>';
+  }
+
+  h += '<button onclick="document.getElementById(\'' + modalId + '\').remove()" style="margin-left:auto;border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>';
+  h += '</div>';
+
+  h += '<div style="overflow-y:auto;flex:1"><table style="border-collapse:collapse;width:100%;font-size:11px">';
+  h += '<thead><tr style="background:var(--bg2);position:sticky;top:0">';
+  ['☐','','Nom','✓','Zonage','QI','Stock','Colis','Famille'].forEach(function(c) {
+    h += '<th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap">' + c + '</th>';
+  });
+  h += '</tr></thead><tbody id="' + modalId + '-tbody">' + _kdBuildRows(prods) + '</tbody></table></div></div>';
+
+  modal.innerHTML = h;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
 }
 
 function kdOpenAbc(zoneName, abc, supId) {
