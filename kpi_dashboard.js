@@ -38,7 +38,8 @@ function rKpiDashboard() {
   var el = document.getElementById('kpi-dashboard-page');
   if (!el) return;
   var qiqdCount = window.QIQD ? Object.keys(window.QIQD).length : 0;
-  if ((!P || !P.length) && qiqdCount === 0) {
+  var hasVisibleData = (P && P.length) || (qiqdCount > 0 && kdQIQDToPseudoProds().length > 0);
+  if (!hasVisibleData) {
     var timeline = (typeof kdBuildTodayTimeline === 'function') ? kdBuildTodayTimeline() : '';
     el.innerHTML = (timeline ? '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin:16px;overflow:hidden">' + timeline + '</div>' : '')
       + '<div style="padding:40px;text-align:center">'
@@ -259,7 +260,12 @@ function kdQIQDToPseudoProds() {
       c:     1,
       bc:    '',
     };
-  }).filter(function(p) { return p.q > 0; });
+  }).filter(function(p) {
+    if (p.q <= 0) return false;
+    // Respecte NAV_FILTER (toggle ON/OFF dans le panneau sources)
+    if (typeof NAV_FILTER !== 'undefined' && NAV_FILTER[p.supId] === false) return false;
+    return true;
+  });
 }
 
 // ── Construction de la page ───────────────────────────────
