@@ -37,7 +37,8 @@ async function kdLoadAll() {
 function rKpiDashboard() {
   var el = document.getElementById('kpi-dashboard-page');
   if (!el) return;
-  if (!P || !P.length) {
+  var qiqdCount = window.QIQD ? Object.keys(window.QIQD).length : 0;
+  if ((!P || !P.length) && qiqdCount === 0) {
     var timeline = (typeof kdBuildTodayTimeline === 'function') ? kdBuildTodayTimeline() : '';
     el.innerHTML = (timeline ? '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin:16px;overflow:hidden">' + timeline + '</div>' : '')
       + '<div style="padding:40px;text-align:center">'
@@ -236,6 +237,15 @@ function kdBuildTable(supName, supId, comp) {
   return h;
 }
 
+// ── Pseudo-produits depuis QIQD seul (quand P n'est pas chargé) ──────────────
+function kdQIQDToPseudoProds() {
+  if (!window.QIQD) return [];
+  return Object.keys(window.QIQD).map(function(id) {
+    var q = window.QIQD[id];
+    return { id: parseInt(id), a: q.area || 0, supId: q.supId || '__none__', q: q.qi || 0, st: q.stock || 0, rupt: q.rupt };
+  }).filter(function(p) { return p.q > 0; });
+}
+
 // ── Construction de la page ───────────────────────────────
 function kdBuildPage() {
   var qiqdCount = typeof window !== 'undefined' && window.QIQD ? Object.keys(window.QIQD).length : 0;
@@ -266,16 +276,19 @@ function kdBuildPage() {
   h += kdBuildTodayTimeline();
 
 
-  // Récupère les supIds présents dans P (dans l'ordre d'apparition)
+  // Source : P si chargé, sinon pseudo-produits depuis QIQD
+  var sourceProds = (P && P.length) ? P : kdQIQDToPseudoProds();
+
+  // Récupère les supIds présents dans la source (dans l'ordre d'apparition)
   var supIds = [];
   var seen   = {};
-  P.forEach(function(p) {
+  sourceProds.forEach(function(p) {
     var sid = p.supId || '__none__';
     if (!seen[sid]) { seen[sid] = true; supIds.push(sid); }
   });
 
   supIds.forEach(function(supId) {
-    var prods   = P.filter(function(p) { return (p.supId || '__none__') === supId; });
+    var prods   = sourceProds.filter(function(p) { return (p.supId || '__none__') === supId; });
     var supName = supId === '__none__'
       ? 'CSV / Data embarquée'
       : ((typeof SUPPLIERS_DICT !== 'undefined' && SUPPLIERS_DICT[supId])

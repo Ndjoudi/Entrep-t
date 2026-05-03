@@ -37,7 +37,7 @@ async function uFetchQIQD(opts) { // retourne une Promise
         var d = await r.json();
         if (d.error) { setStatus('❌ ' + d.error, 'var(--r,#d32f2f)'); break; }
         var prods = d.products || [];
-        prods.forEach(function(p) { window.QIQD[p.id] = p; });
+        prods.forEach(function(p) { window.QIQD[p.id] = Object.assign({}, p, { supId: String(supId) }); });
         totalLoaded += prods.length;
         pageTotal = d.total || 0;
         offset += limit;
