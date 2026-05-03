@@ -102,7 +102,7 @@ function kdComputeData(prods) {
     if (qi <= 0) return;
 
     var hasSt    = stock > 0;
-    var isQiReel = (rupDays !== undefined && rupDays !== null && rupDays >= 30);
+    var isQiReel = (rupDays !== undefined && rupDays !== null && rupDays < 30);
 
     function acc(node) {
       node.withQI++;
@@ -211,7 +211,7 @@ function kdBuildTable(supName, supId, comp) {
   h += '<th style="' + thr + '">Prod avec QI</th>';
   h += '<th style="' + thr + '">En stock</th>';
   h += '<th style="' + thr + '">% Rupture</th>';
-  h += '<th style="' + thd + '" title="Produits avec QI ≥ 1 et rupture ≥ 30j">QI réel</th>';
+  h += '<th style="' + thd + '" title="Produits avec QI ≥ 1 et rupture < 30j">QI réel</th>';
   h += '<th style="' + thd + '" title="En stock / QI réel × 100">% Rupt. réelle</th>';
   h += '</tr></thead><tbody>';
 

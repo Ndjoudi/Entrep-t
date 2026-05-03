@@ -49,19 +49,19 @@ async function uFetchQIQD(opts) { // retourne une Promise
 
     // Applique sur P si chargé
     if (typeof P !== 'undefined' && P && P.length) {
-      var updated = 0;
       P.forEach(function(p) {
         var q = window.QIQD[p.id];
         if (!q) return;
         p.st  = q.stock != null ? q.stock : p.st;
         p.q   = q.qi   != null ? q.qi    : p.q;
-        p.rupt = q.rupt;      // jours de rupture 30j
-        updated++;
+        p.rupt = q.rupt;
       });
-      if (typeof computeAlerts  === 'function') computeAlerts();
-      if (typeof updateBadge    === 'function') updateBadge();
-      if (typeof rKpiDashboard  === 'function') rKpiDashboard();
+      if (typeof computeAlerts === 'function') computeAlerts();
+      if (typeof updateBadge   === 'function') updateBadge();
     }
+
+    // Rafraîchit le dashboard dans tous les cas (P chargé ou QIQD seul)
+    if (typeof rKpiDashboard === 'function') rKpiDashboard();
 
     var msg = '✅ QIQD : ' + totalLoaded + ' produits (' + supplierIds.length + ' fournisseur(s))';
     setStatus(msg, 'var(--g,#388e3c)');
