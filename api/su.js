@@ -378,7 +378,7 @@ module.exports = async function handler(req, res) {
     } else if (action === 'probe_qiqd') {
       // ── Probe : maintenant qu'on connaît l'URL, teste juste api.labellevie.com ──
       var supplierId = req.query.supplier || '191';
-      var qs = '?center_id=9&offset=0&limit=3&order=product_name&supplier_id=' + supplierId + '&not_order=0&not_order_sold=0&has_stock=1&disponibility=order';
+      var qs = '?center_id=9&offset=0&limit=3&order=product_name&supplier_id=' + supplierId;
       var candidates = [
         'https://api.labellevie.com/1.0/api/labellevie/products-qiqd' + qs,
       ];
@@ -418,8 +418,7 @@ module.exports = async function handler(req, res) {
 
       while (maxIter-- > 0) {
         var qUrl = BASE_QIQD + '?center_id=9&offset=' + offset + '&limit=' + limit +
-          '&order=product_name&supplier_id=' + supplierId +
-          '&not_order=0&not_order_sold=0&disponibility=order';
+          '&order=product_name&supplier_id=' + supplierId;
         var qR = await fetch(qUrl, { headers: headersLBV, redirect: 'follow' });
         if (!qR.ok) return res.status(200).json({ error: 'HTTP ' + qR.status });
         var qText = await qR.text();

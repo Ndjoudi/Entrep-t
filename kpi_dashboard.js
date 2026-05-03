@@ -101,7 +101,7 @@ function kdComputeData(prods) {
     if (qi <= 0) return;
 
     var hasSt    = stock > 0;
-    var isQiReel = (rupDays === undefined || rupDays === null || rupDays < 30);
+    var isQiReel = (rupDays !== undefined && rupDays !== null && rupDays >= 30);
 
     function acc(node) {
       node.withQI++;
@@ -171,12 +171,12 @@ function kdDvPctCell(pct, zd, hasDV, style, zoneName, supId) {
   if (!hasDV) return '<td style="' + (style || 'padding:7px 14px;text-align:right;color:var(--text3)') + '">—</td>';
   var s   = style || 'padding:7px 14px;text-align:right;white-space:nowrap';
   var fmt = function(v) { return v.toFixed(1) + '%'; };
-  var h   = '<td style="' + s + '"><span style="font-weight:700;color:' + kdPctColor(100 - (pct - 100)) + '">' + fmt(pct) + '</span>';
+  var h   = '<td style="' + s + '"><span style="font-weight:700;color:' + kdPctColor(pct) + '">' + fmt(pct) + '</span>';
   ['A','B','C'].forEach(function(abc) {
     var ad = zd.abc[abc];
     if (!ad || ad.withQI === 0) return;
-    var p2 = ad.qiReel > 0 ? ad.withQI / ad.qiReel * 100 : 0;
-    h += kdBadge(abc, fmt(p2), kdPctColor(200 - p2), zoneName, supId);
+    var p2 = ad.qiReel > 0 ? ad.inStock / ad.qiReel * 100 : 0;
+    h += kdBadge(abc, fmt(p2), kdPctColor(p2), zoneName, supId);
   });
   return h + '</td>';
 }
@@ -210,8 +210,8 @@ function kdBuildTable(supName, supId, comp) {
   h += '<th style="' + thr + '">Prod avec QI</th>';
   h += '<th style="' + thr + '">En stock</th>';
   h += '<th style="' + thr + '">% Rupture</th>';
-  h += '<th style="' + thd + '" title="Produits avec QI ≥ 1 et rupture < 30j">QI réel</th>';
-  h += '<th style="' + thd + '" title="Prod avec QI / QI réel × 100">% Rupt. réelle</th>';
+  h += '<th style="' + thd + '" title="Produits avec QI ≥ 1 et rupture ≥ 30j">QI réel</th>';
+  h += '<th style="' + thd + '" title="En stock / QI réel × 100">% Rupt. réelle</th>';
   h += '</tr></thead><tbody>';
 
   ZONE_ORDER.forEach(function(zoneName) {
@@ -220,7 +220,7 @@ function kdBuildTable(supName, supId, comp) {
 
     var zColor = ZC[zoneName] || '#757575';
     var pct  = zd.withQI > 0 ? zd.inStock / zd.withQI * 100 : 0;
-    var pctR = zd.qiReel > 0 ? zd.withQI / zd.qiReel * 100 : 0;
+    var pctR = zd.qiReel > 0 ? zd.inStock / zd.qiReel * 100 : 0;
 
     h += '<tr style="background:var(--bg2);border-bottom:1px solid var(--border)">';
     h += '<td style="padding:8px 14px;font-weight:700;font-size:13px;color:' + zColor + '">' + zoneName + '</td>';
