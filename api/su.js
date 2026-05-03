@@ -443,6 +443,7 @@ module.exports = async function handler(req, res) {
       var normalized = allProds.map(function(r) {
         return {
           id:      r.product_id,
+          name:    r.product_name || '',
           stock:   r.stock,           // stock actuel
           qi:      r.current_qi,      // QI actuel
           qd:      r.current_qd,      // QD actuel

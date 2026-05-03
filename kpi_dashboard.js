@@ -245,7 +245,20 @@ function kdQIQDToPseudoProds() {
   if (!window.QIQD) return [];
   return Object.keys(window.QIQD).map(function(id) {
     var q = window.QIQD[id];
-    return { id: parseInt(id), a: q.area || 0, supId: q.supId || '__none__', q: q.qi || 0, st: q.stock || 0, rupt: q.rupt };
+    return {
+      id:    parseInt(id),
+      n:     q.name  || '',
+      a:     q.area  || 0,
+      z:     (q.area || 0) + '.0.0',
+      supId: q.supId || '__none__',
+      q:     q.qi    || 0,
+      st:    q.stock || 0,
+      rupt:  q.rupt,
+      rupt90: q.rupt90,
+      f:     '?',
+      c:     1,
+      bc:    '',
+    };
   }).filter(function(p) { return p.q > 0; });
 }
 
