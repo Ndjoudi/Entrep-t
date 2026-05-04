@@ -11,11 +11,16 @@ async function uFetchQIQD(opts) { // retourne une Promise
     : (typeof getActiveFournIds === 'function' ? getActiveFournIds() : ['191']);
 
   const statusEl  = opts.statusEl  || null;
+  const textEl    = opts.textEl    || null;
   const btnEl     = opts.btnEl     || null;
   const bypassToken = (typeof getBypassToken === 'function') ? getBypassToken() : '';
 
   function setStatus(msg, color) {
     if (statusEl) { statusEl.style.display='block'; statusEl.textContent=msg; statusEl.style.color=color||'var(--accent,#1976d2)'; }
+  }
+  function setQIProgress(loaded, total) {
+    if (!textEl) return;
+    textEl.textContent = total > 0 ? Math.round(Math.min(loaded, total) / total * 100) + '%' : '…';
   }
 
   if (!bypassToken) { setStatus('⚠️ Token manquant — configurez dans l\'onglet Fournisseurs', 'var(--o,#f57c00)'); return; }
@@ -41,6 +46,7 @@ async function uFetchQIQD(opts) { // retourne une Promise
         totalLoaded += prods.length;
         pageTotal = d.total || 0;
         offset += limit;
+        setQIProgress(totalLoaded, pageTotal * supplierIds.length || totalLoaded);
         if (pageTotal > 0 && offset >= pageTotal) break;
         if (prods.length < limit) break;
         await new Promise(function(res){ setTimeout(res, 60); });
@@ -389,15 +395,27 @@ async function navSrcLoadData() {
   }
 }
 
+// ── Proxy minimal : met le % directement sur le bouton ───────────────────────
+function makeBtnPctEl(btn) {
+  var el = {};
+  Object.defineProperty(el, 'textContent', {
+    set: function(v) {
+      if (!btn) return;
+      var m = String(v).match(/\((\d+)%\)/);   // "200 / 500 produits (40%)"
+      btn.textContent = m ? m[1] + '%' : String(v); // si déjà "40%" ça passe direct
+    },
+    get: function() { return ''; }
+  });
+  return el;
+}
+
 // ── Chargement individuel : Prod pour un fournisseur ─────────────────────────
 async function navSrcOneProd(supId) {
   var st  = document.getElementById('navSrcStatus');
   var btn = document.getElementById('nbtn_prod_' + supId);
-  var loadingStyle = 'border:1px solid var(--border);background:var(--surface2);color:var(--text3)';
-  if (btn) { btn.disabled = true; btn.style.cssText += ';' + loadingStyle; btn.textContent = '⏳…'; }
-  if (st) { st.style.display='block'; st.textContent='⏳ Prod ' + supId + '…'; st.style.color='var(--accent)'; }
+  if (btn) { btn.disabled = true; btn.textContent = '0%'; }
 
-  await uFetchProducts({ supplierIds:[supId], statusEl:st, progressEl:null, fillEl:null, textEl:null, btnEl:null });
+  await uFetchProducts({ supplierIds:[supId], statusEl:st, progressEl:null, fillEl:null, textEl:makeBtnPctEl(btn), btnEl:null });
 
   NAV_LOADED.prod[supId] = true;
   if (NAV_FILTER[supId] === undefined) NAV_FILTER[supId] = true;
@@ -410,11 +428,9 @@ async function navSrcOneProd(supId) {
 async function navSrcOneQIQD(supId) {
   var st  = document.getElementById('navSrcStatus');
   var btn = document.getElementById('nbtn_qirupt_' + supId);
-  var loadingStyle = 'border:1px solid var(--border);background:var(--surface2);color:var(--text3)';
-  if (btn) { btn.disabled = true; btn.style.cssText += ';' + loadingStyle; btn.textContent = '⏳…'; }
-  if (st) { st.style.display='block'; st.textContent='⏳ QI/Rupt ' + supId + '…'; st.style.color='var(--accent)'; }
+  if (btn) { btn.disabled = true; btn.textContent = '0%'; }
 
-  await uFetchQIQD({ supplierIds:[supId], statusEl:st, btnEl:null });
+  await uFetchQIQD({ supplierIds:[supId], statusEl:st, textEl:makeBtnPctEl(btn), btnEl:null });
 
   NAV_LOADED.qiqd[supId] = true;
   initNavSrcPanel();
