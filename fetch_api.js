@@ -27,7 +27,7 @@ async function uFetchQIQD(opts) { // retourne une Promise
     for (var si = 0; si < supplierIds.length; si++) {
       var supId = supplierIds[si];
       var supName = (typeof NAV_SUPPLIERS !== 'undefined' && NAV_SUPPLIERS[supId]) || ('#' + supId);
-      setStatus('QIQD ' + (si+1) + '/' + supplierIds.length + ' — ' + supName + '…');
+      setStatus('⏳ QI/Rupt ' + (si+1) + '/' + supplierIds.length + ' — ' + supName + '…');
 
       var offset = 0, limit = 500, pageTotal = 0, maxIter = 50;
       while (maxIter-- > 0) {
@@ -64,7 +64,7 @@ async function uFetchQIQD(opts) { // retourne une Promise
     // Rafraîchit le dashboard dans tous les cas (P chargé ou QIQD seul)
     if (typeof rKpiDashboard === 'function') rKpiDashboard();
 
-    var msg = '✅ QIQD : ' + totalLoaded + ' produits (' + supplierIds.length + ' fournisseur(s))';
+    var msg = '✅ QI/Rupt : ' + totalLoaded + ' produits (' + supplierIds.length + ' fournisseur(s))';
     setStatus(msg, 'var(--g,#388e3c)');
     if (typeof showToast === 'function') showToast(msg);
 
@@ -280,10 +280,22 @@ function initNavSrcPanel() {
     ? 'border:1px solid var(--g,#388e3c);background:color-mix(in srgb,var(--g,#388e3c) 10%,transparent);color:var(--g,#388e3c)'
     : 'border:1px solid var(--accent,#1976d2);background:color-mix(in srgb,var(--accent,#1976d2) 10%,transparent);color:var(--accent,#1976d2)';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);gap:8px">';
-  html += '<div><div style="font-size:12px;font-weight:500">📦 Data embarquée</div>'
-        + '<div style="font-size:10px;color:var(--text3)">' + (dataLoaded ? P.length + ' produits en mémoire' : 'Données intégrées dans data.js') + '</div></div>';
+  html += '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:500">📦 Data embarquée</div>'
+        + '<div style="font-size:10px;color:var(--text3)">' + (dataOk ? P_ALL.filter(function(p){return p.supId==='__data__';}).length + ' produits' : 'Données intégrées dans data.js') + '</div></div>';
   html += '<button onclick="navSrcLoadData()" style="font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;white-space:nowrap;' + dataSt + '">'
         + (dataOk ? '✓ Chargé' : 'Charger') + '</button>';
+  if (dataOk) {
+    if (NAV_FILTER['__data__'] === undefined) NAV_FILTER['__data__'] = true;
+    var dOn = NAV_FILTER['__data__'] !== false;
+    var dBg = dOn ? 'var(--accent,#1976d2)' : '#bbb';
+    var dTx = dOn ? '16px' : '2px';
+    html += '<span id="nfil___data__" onclick="navFilterToggle(\'__data__\')" '
+          + 'style="display:inline-flex;width:38px;height:22px;border-radius:11px;background:' + dBg + ';'
+          + 'align-items:center;cursor:pointer;transition:background .2s;padding:3px;box-sizing:border-box;flex-shrink:0" title="Afficher dans le dashboard">'
+          + '<span id="nfil_k___data__" style="width:16px;height:16px;border-radius:50%;background:#fff;'
+          + 'transform:translateX(' + dTx + ');transition:transform .2s;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span>'
+          + '</span>';
+  }
   html += '</div>';
 
   // ── Import CSV ────────────────────────────────────────────
@@ -312,8 +324,8 @@ function initNavSrcPanel() {
       html += '<div style="flex:1;min-width:0">'
             + '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (f.name || f.id) + '</div>'
             + '<div style="font-size:10px;color:var(--text3);font-family:\'Geist Mono\',monospace">ID ' + f.id + '</div></div>';
-      html += '<button onclick="navSrcOneProd(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + prodSt + '">' + (prodOk ? '✓ Prod' : 'Prod') + '</button>';
-      html += '<button onclick="navSrcOneQIQD(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + qiqdSt + '">' + (qiqdOk ? '✓ QI/QD' : 'QI/QD') + '</button>';
+      html += '<button id="nbtn_prod_' + f.id + '" onclick="navSrcOneProd(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + prodSt + '">' + (prodOk ? '✓ Prod' : 'Prod') + '</button>';
+      html += '<button id="nbtn_qirupt_' + f.id + '" onclick="navSrcOneQIQD(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;white-space:nowrap;' + qiqdSt + '">' + (qiqdOk ? '✓ QI/Rupt' : 'QI/Rupt') + '</button>';
       // Toggle filtre — apparaît seulement si chargé
       if (prodOk || qiqdOk) {
         if (NAV_FILTER[f.id] === undefined) NAV_FILTER[f.id] = true;
@@ -354,12 +366,22 @@ async function navSrcLoadData() {
     var all = new Uint8Array(ch.reduce(function(a,c){return a+c.length;},0));
     var off = 0; ch.forEach(function(c){all.set(c,off);off+=c.length;});
     var parsed = JSON.parse(new TextDecoder().decode(all));
-    P.length = 0;
-    parsed.forEach(function(p){P.push(p);});
+
+    // Assigne supId '__data__' pour pouvoir filtrer indépendamment
+    parsed.forEach(function(p){ if (!p.supId) p.supId = '__data__'; });
     if (typeof applyFamOv === 'function') applyFamOv();
+
+    // Ajoute dans P_ALL sans écraser les produits API déjà chargés
+    var existingIds = {};
+    P_ALL.forEach(function(p){ existingIds[p.id] = true; });
+    parsed.forEach(function(p){ if (!existingIds[p.id]) P_ALL.push(p); });
+
+    // Active le filtre par défaut
+    if (NAV_FILTER['__data__'] === undefined) NAV_FILTER['__data__'] = true;
+    navApplyFilter();
+
     NAV_LOADED.data = true;
-    navSyncPAll();
-    setMsg('✅ Data : ' + P.length + ' produits', 'var(--g,#388e3c)');
+    setMsg('✅ Data : ' + parsed.length + ' produits', 'var(--g,#388e3c)');
     initNavSrcPanel();
     navSrcRefresh();
   } catch(e) {
@@ -369,23 +391,33 @@ async function navSrcLoadData() {
 
 // ── Chargement individuel : Prod pour un fournisseur ─────────────────────────
 async function navSrcOneProd(supId) {
-  var st = document.getElementById('navSrcStatus');
+  var st  = document.getElementById('navSrcStatus');
+  var btn = document.getElementById('nbtn_prod_' + supId);
+  var loadingStyle = 'border:1px solid var(--border);background:var(--surface2);color:var(--text3)';
+  if (btn) { btn.disabled = true; btn.style.cssText += ';' + loadingStyle; btn.textContent = '⏳…'; }
   if (st) { st.style.display='block'; st.textContent='⏳ Prod ' + supId + '…'; st.style.color='var(--accent)'; }
+
   await uFetchProducts({ supplierIds:[supId], statusEl:st, progressEl:null, fillEl:null, textEl:null, btnEl:null });
+
   NAV_LOADED.prod[supId] = true;
   if (NAV_FILTER[supId] === undefined) NAV_FILTER[supId] = true;
-  navSyncPAll();       // met à jour P_ALL après le chargement
+  navSyncPAll();
   initNavSrcPanel();
   navSrcRefresh();
 }
 
-// ── Chargement individuel : QI/QD pour un fournisseur ────────────────────────
+// ── Chargement individuel : QI/Rupt pour un fournisseur ──────────────────────
 async function navSrcOneQIQD(supId) {
-  var st = document.getElementById('navSrcStatus');
-  if (st) { st.style.display='block'; st.textContent='⏳ QI/QD ' + supId + '…'; st.style.color='var(--accent)'; }
+  var st  = document.getElementById('navSrcStatus');
+  var btn = document.getElementById('nbtn_qirupt_' + supId);
+  var loadingStyle = 'border:1px solid var(--border);background:var(--surface2);color:var(--text3)';
+  if (btn) { btn.disabled = true; btn.style.cssText += ';' + loadingStyle; btn.textContent = '⏳…'; }
+  if (st) { st.style.display='block'; st.textContent='⏳ QI/Rupt ' + supId + '…'; st.style.color='var(--accent)'; }
+
   await uFetchQIQD({ supplierIds:[supId], statusEl:st, btnEl:null });
+
   NAV_LOADED.qiqd[supId] = true;
-  initNavSrcPanel();   // rafraîchit le panel (bouton → vert)
+  initNavSrcPanel();
   navSrcRefresh();
 }
 
@@ -402,8 +434,8 @@ function navSyncPAll() {
 function navApplyFilter() {
   P.length = 0;
   P_ALL.forEach(function(p) {
-    // Inclure si : pas de supId, ou supId non filtré, ou filtre explicitement ON
-    if (!p.supId || NAV_FILTER[p.supId] !== false) P.push(p);
+    // Inclure si : supId non filtré (undefined = ON par défaut) ou explicitement ON
+    if (NAV_FILTER[p.supId || '__data__'] !== false) P.push(p);
   });
 }
 
