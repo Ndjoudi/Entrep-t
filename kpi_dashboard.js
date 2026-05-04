@@ -155,7 +155,7 @@ function kdCell(total, zd, getVal, fmt, style, zoneName, supId) {
 
 function kdPctStockCell(pct, zd, style, zoneName, supId) {
   var s   = style || 'padding:7px 14px;text-align:right;white-space:nowrap';
-  var fmt = function(v) { return v.toFixed(1) + '%'; };
+  var fmt = function(v) { return Math.round(v) + '%'; };
   var h   = '<td style="' + s + '"><span style="font-weight:700;color:' + kdPctColor(pct) + '">' + fmt(pct) + '</span>';
   ['A','B','C'].forEach(function(abc) {
     var ad = zd.abc[abc];
@@ -174,7 +174,7 @@ function kdDvCountCell(total, zd, hasDV, style, zoneName, supId) {
 function kdDvPctCell(pct, zd, hasDV, style, zoneName, supId) {
   if (!hasDV) return '<td style="' + (style || 'padding:7px 14px;text-align:right;color:var(--text3)') + '">—</td>';
   var s   = style || 'padding:7px 14px;text-align:right;white-space:nowrap';
-  var fmt = function(v) { return v.toFixed(1) + '%'; };
+  var fmt = function(v) { return Math.round(v) + '%'; };
   var h   = '<td style="' + s + '"><span style="font-weight:700;color:' + kdPctColor(pct) + '">' + fmt(pct) + '</span>';
   ['A','B','C'].forEach(function(abc) {
     var ad = zd.abc[abc];
