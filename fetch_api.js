@@ -53,6 +53,15 @@ async function uFetchQIQD(opts) { // retourne une Promise
       }
     }
 
+    // Enrichit P_ABC depuis sale30 (seulement si pas déjà défini par le plan)
+    if (typeof P_ABC !== 'undefined') {
+      Object.keys(window.QIQD).forEach(function(id) {
+        if (P_ABC[id] !== undefined) return; // plan a la priorité
+        var s = window.QIQD[id].sale30 || 0;
+        P_ABC[id] = s >= 30 ? 'A' : s >= 10 ? 'B' : s >= 1 ? 'C' : 'D';
+      });
+    }
+
     // Applique sur P si chargé
     if (typeof P !== 'undefined' && P && P.length) {
       P.forEach(function(p) {

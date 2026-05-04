@@ -1,6 +1,13 @@
 // ── KPI Dashboard module ─────────────────────────────────
 // Dépendances : P, P_ABC, zone, ZC, DV (ventes.js – optionnel)
 
+var _kdAbcVis = { A: true, B: true, C: true };
+
+function kdToggleAbc(abc) {
+  _kdAbcVis[abc] = !_kdAbcVis[abc];
+  rKpiDashboard();
+}
+
 // ── Chargement initial depuis le Dashboard (produits + QI/QD) ─────────────
 async function kdLoadAll() {
   var st = document.getElementById('kdLoadStatus');
@@ -38,7 +45,7 @@ function rKpiDashboard() {
   var el = document.getElementById('kpi-dashboard-page');
   if (!el) return;
   var qiqdCount = window.QIQD ? Object.keys(window.QIQD).length : 0;
-  var hasVisibleData = (P && P.length) || (qiqdCount > 0 && kdQIQDToPseudoProds().length > 0);
+  var hasVisibleData = kdQIQDToPseudoProds().length > 0 || (P && P.length > 0);
   if (!hasVisibleData) {
     var timeline = (typeof kdBuildTodayTimeline === 'function') ? kdBuildTodayTimeline() : '';
     el.innerHTML = (timeline ? '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin:16px;overflow:hidden">' + timeline + '</div>' : '')
@@ -132,6 +139,7 @@ var _abcBg  = { A: 'var(--gbg)', B: 'var(--obg)', C: 'var(--rbg)', D: '#f3e8ff' 
 
 // Badge cliquable si zoneName + supId fournis
 function kdBadge(abc, val, color, zoneName, supId) {
+  if (!_kdAbcVis[abc]) return '';
   var bg    = _abcBg[abc]  || 'var(--bg2)';
   var col   = color || _abcCol[abc] || 'var(--text)';
   var click = (zoneName != null)
@@ -256,7 +264,7 @@ function kdQIQDToPseudoProds() {
       st:    q.stock || 0,
       rupt:  q.rupt,
       rupt90: q.rupt90,
-      f:     '?',
+      f:     (typeof P_ABC !== 'undefined' && P_ABC[parseInt(id)]) || (function(){ var s=q.sale30||0; return s>=30?'A':s>=10?'B':s>=1?'C':'D'; })(),
       c:     1,
       bc:    '',
     };
@@ -281,6 +289,15 @@ function kdBuildPage() {
      + 'padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap">';
   h += '<span style="font-size:14px;font-weight:700">Dashboard Ruptures</span>';
 
+  // Boutons A / B / C
+  ['A','B','C'].forEach(function(abc) {
+    var on  = _kdAbcVis[abc];
+    var col = _abcCol[abc] || 'var(--text)';
+    var bg  = on ? _abcBg[abc] : 'var(--bg2)';
+    var brd = on ? col : 'var(--border)';
+    h += '<button onclick="kdToggleAbc(\'' + abc + '\')" style="border:1px solid ' + brd + ';background:' + bg + ';color:' + (on ? col : 'var(--text3)') + ';border-radius:6px;padding:2px 10px;font-size:11px;font-weight:700;cursor:pointer">' + abc + '</button>';
+  });
+
   if (qiqdCount > 0) {
     h += '<span style="font-size:11px;background:var(--gbg);color:var(--g);border:1px solid var(--gbrd);'
        + 'padding:2px 10px;border-radius:20px">✓ QI/QD — ' + qiqdCount + ' produits'
@@ -298,8 +315,9 @@ function kdBuildPage() {
   h += kdBuildTodayTimeline();
 
 
-  // Source : P si chargé, sinon pseudo-produits depuis QIQD
-  var sourceProds = (P && P.length) ? P : kdQIQDToPseudoProds();
+  // Source : QIQD en priorité (plus complet), sinon P
+  var _qiqdProds = kdQIQDToPseudoProds();
+  var sourceProds = _qiqdProds.length > 0 ? _qiqdProds : (P && P.length ? P : []);
 
   // Récupère les supIds présents dans la source (dans l'ordre d'apparition)
   var supIds = [];
